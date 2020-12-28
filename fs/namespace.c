@@ -3172,8 +3172,7 @@ static int do_add_mount(struct mount *newmnt, struct mountpoint *mp,
 				rsbac_target_id,
 				A_none,
 				rsbac_attribute_value)) {
-		err = -EPERM;
-		goto unlock;
+		return -EPERM;
 	}
 	rsbac_pr_debug(aef, "[do_mount() [sys_mount()]]: calling ADF for DEV\n");
 	rsbac_target_id.dev.type = D_block;
@@ -3186,8 +3185,7 @@ static int do_add_mount(struct mount *newmnt, struct mountpoint *mp,
 				rsbac_target_id,
 				A_mode,
 				rsbac_attribute_value)) {
-		err = -EPERM;
-		goto unlock;
+		return -EPERM;
 	}
 #endif
 
