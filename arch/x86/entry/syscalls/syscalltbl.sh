@@ -18,6 +18,14 @@ emit() {
     local entry="$3"
     local compat="$4"
 
+    # -z string; True if the length of string is zero
+    if [ -z "$CONFIG_RSBAC" ]; then
+	# exclude rsbac syscall
+	if [ "$entry" = "sys_rsbac" ]; then
+	    return
+	fi
+    fi
+
     if [ "$abi" != "I386" -a -n "$compat" ]; then
 	echo "a compat entry ($abi: $compat) for a 64-bit syscall makes no sense" >&2
 	exit 1

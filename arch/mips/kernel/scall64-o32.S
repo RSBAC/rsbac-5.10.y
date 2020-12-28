@@ -220,3 +220,6 @@ einval: li	v0, -ENOSYS
 EXPORT(sys32_call_table)
 #include <asm/syscall_table_64_o32.h>
 #undef __SYSCALL
+#ifdef CONFIG_RSBAC
+	PTR	sys_rsbac			/* Security */
+#endif
