@@ -5,7 +5,7 @@
 /* (some smaller parts copied from fs/namei.c        */
 /*  and others)                                      */
 /*                                                   */
-/* Last modified: 08/May/2020                        */
+/* Last modified: 29/Dec/2020                        */
 /*************************************************** */
 
 #include <linux/types.h>
@@ -41,6 +41,7 @@
 #include <linux/file.h>
 #include <linux/namei.h>
 #include <linux/spinlock.h>
+#include <linux/fdtable.h>
 #include <uapi/linux/mount.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
@@ -61,6 +62,7 @@
 #include <linux/string.h>
 #include <linux/kdev_t.h>
 #include "../../fs/mount.h"
+#include "../../fs/internal.h"
 
 #define FUSE_SUPER_MAGIC 0x65735546
 #define CEPH_SUPER_MAGIC 0x00c36400
@@ -400,13 +402,13 @@ static rsbac_boolean_t rsbac_want_cache(struct rsbac_device_list_item_t * device
 {
 	if (   !rsbac_fd_cache_disable
 	    && (   (device_p->major > 1)
-	        || (   device_p->vfsmount_p
-	            && device_p->vfsmount_p->mnt_sb
-	            && (
-	                   (rsbac_fd_cache_fuse && device_p->vfsmount_p->mnt_sb->s_magic == FUSE_SUPER_MAGIC)
-	                || (rsbac_fd_cache_ceph && device_p->vfsmount_p->mnt_sb->s_magic == CEPH_SUPER_MAGIC)
+		|| (   device_p->vfsmount_p
+		    && device_p->vfsmount_p->mnt_sb
+		    && (
+			   (rsbac_fd_cache_fuse && device_p->vfsmount_p->mnt_sb->s_magic == FUSE_SUPER_MAGIC)
+			|| (rsbac_fd_cache_ceph && device_p->vfsmount_p->mnt_sb->s_magic == CEPH_SUPER_MAGIC)
 		       )
-	           )
+		   )
 	       )
 	   )
 		return TRUE;
@@ -446,13 +448,21 @@ static int rsbac_set_rsbac_dat_inode(__u32 major, __u32 minor, long dir_fd)
 	return 0;
 }
 
+/* copy from fs/open.c */
+#define WILL_CREATE(flags)      (flags & (O_CREAT | __O_TMPFILE))
+#define O_PATH_FLAGS            (O_DIRECTORY | O_NOFOLLOW | O_PATH | O_CLOEXEC)
+/* end of copy from fs/open.c */
+
 static int rsbac_aci_path_open(__u32 major, __u32 minor, rsbac_boolean_t create_dir)
 {
 	long root_fd = 0;
 	long dir_fd = 0;
 	struct file * f;
 	struct vfsmount *vfsmount_p;
-	mm_segment_t oldfs;
+	struct open_how how = build_open_how(O_RDONLY, 0);
+	struct open_flags op;
+	struct path path;
+	struct dentry *dentry;
 
 	root_fd = get_unused_fd_flags(O_RDONLY);
 	if (root_fd < 0)
@@ -476,14 +486,28 @@ static int rsbac_aci_path_open(__u32 major, __u32 minor, rsbac_boolean_t create_
 
 	fd_install(root_fd, f);
 
-	oldfs = get_fs();
-	set_fs(KERNEL_DS);
-	dir_fd = do_sys_open(root_fd, RSBAC_ACI_PATH, O_RDONLY, 0);
-	set_fs(oldfs);
-	if (dir_fd >= 0) {
+	dir_fd = build_open_flags(&how, &op);
+	if (dir_fd < 0) {
 		ksys_close(root_fd);
-		rsbac_set_rsbac_dat_inode(major, minor, dir_fd);
-		return dir_fd;
+		rsbac_printk(KERN_WARNING "rsbac_aci_path_open(): creating %s dir on device %02u:%02u failed with error %li\n",
+			     RSBAC_ACI_PATH, major, minor, dir_fd);
+		return -RSBAC_ENOTFOUND;
+	}
+	dir_fd = get_unused_fd_flags(how.flags);
+	if (dir_fd >= 0) {
+		struct file * f2;
+		struct filename *name = getname_kernel(RSBAC_ACI_PATH);
+
+		f2 = do_filp_open(root_fd, name, &op);
+		putname(name);
+		if (!IS_ERR(f2)) {
+			fsnotify_open(f2);
+			fd_install(dir_fd, f2);
+			ksys_close(root_fd);
+			rsbac_set_rsbac_dat_inode(major, minor, dir_fd);
+			return dir_fd;
+		}
+		put_unused_fd(dir_fd);
 	}
 	if (!create_dir) {
 		ksys_close(root_fd);
@@ -497,28 +521,53 @@ static int rsbac_aci_path_open(__u32 major, __u32 minor, rsbac_boolean_t create_
 	}
 	if (!rsbac_writable(vfsmount_p->mnt_sb)) {
 		rsbac_pr_debug(write, "called for non-writable device\n");
+		ksys_close(root_fd);
 		return -RSBAC_ENOTWRITABLE;
 	}
-	set_fs(KERNEL_DS);
-	dir_fd = do_mkdirat(root_fd, RSBAC_ACI_PATH, 0);
-	set_fs(oldfs);
+	dentry = kern_path_create(AT_FDCWD, RSBAC_ACI_PATH, &path, 0);
+	if (IS_ERR(dentry)) {
+		ksys_close(root_fd);
+		rsbac_printk(KERN_WARNING "rsbac_aci_path_open(): creating %s dir on device %02u:%02u failed with error %li\n",
+			     RSBAC_ACI_PATH, major, minor, PTR_ERR(dentry));
+		done_path_create(&path, dentry);
+		return -RSBAC_ENOTFOUND;
+	}
+	dir_fd = vfs_mknod(path.dentry->d_inode, dentry, 0, MKDEV(major, minor));
+	done_path_create(&path, dentry);
+
 	if (dir_fd < 0) {
 		ksys_close(root_fd);
 		rsbac_printk(KERN_WARNING "rsbac_aci_path_open(): creating %s dir on device %02u:%02u failed with error %li\n",
 			     RSBAC_ACI_PATH, major, minor, dir_fd);
 		return -RSBAC_ENOTFOUND;
 	}
-	set_fs(KERNEL_DS);
-	dir_fd = do_sys_open(root_fd, RSBAC_ACI_PATH, O_RDONLY, 0);
-	set_fs(oldfs);
-	ksys_close(root_fd);
+
+	dir_fd = build_open_flags(&how, &op);
 	if (dir_fd < 0) {
-		rsbac_printk(KERN_WARNING "rsbac_aci_path_open(): opening %s dir on device %02u:%02u after mkdir failed with error %li\n",
+		ksys_close(root_fd);
+		rsbac_printk(KERN_WARNING "rsbac_aci_path_open(): creating %s dir on device %02u:%02u failed with error %li\n",
 			     RSBAC_ACI_PATH, major, minor, dir_fd);
 		return -RSBAC_ENOTFOUND;
 	}
-	rsbac_set_rsbac_dat_inode(major, minor, dir_fd);
-	return dir_fd;
+	dir_fd = get_unused_fd_flags(how.flags);
+	if (dir_fd >= 0) {
+		struct file * f2;
+		struct filename *name = getname_kernel(RSBAC_ACI_PATH);
+
+		f2 = do_filp_open(root_fd, name, &op);
+		putname(name);
+		if (!IS_ERR(f2)) {
+			fsnotify_open(f2);
+			fd_install(dir_fd, f2);
+			ksys_close(root_fd);
+			rsbac_set_rsbac_dat_inode(major, minor, dir_fd);
+			return dir_fd;
+		}
+		put_unused_fd(dir_fd);
+	}
+	rsbac_printk(KERN_WARNING "rsbac_aci_path_open(): opening %s dir on device %02u:%02u after mkdir failed with error %li\n",
+		     RSBAC_ACI_PATH, major, minor, dir_fd);
+	return -RSBAC_ENOTFOUND;
 }
 
 static int rsbac_aci_path_close(unsigned int fd) {
@@ -1053,16 +1102,16 @@ static int cap_old_fd_conv(void *old_desc, void *old_data, void *new_desc, void 
 
 static int cap_old_old_fd_conv(void *old_desc, void *old_data, void *new_desc, void *new_data)
 {
-        struct rsbac_cap_fd_aci_t *new_aci = new_data;
-        struct rsbac_cap_fd_old_old_aci_t *old_aci = old_data;
+	struct rsbac_cap_fd_aci_t *new_aci = new_data;
+	struct rsbac_cap_fd_old_old_aci_t *old_aci = old_data;
 
-        memcpy(new_desc, old_desc, sizeof(rsbac_old_inode_nr_t));
+	memcpy(new_desc, old_desc, sizeof(rsbac_old_inode_nr_t));
 	new_aci->min_caps.cap[0] = old_aci->min_caps;
 	new_aci->max_caps.cap[0] = old_aci->max_caps;
 	new_aci->min_caps.cap[1] = (__u32) 0;
 	new_aci->max_caps.cap[1] = (__u32) -1;
-        new_aci->cap_ld_env = LD_inherit;
-        return 0;
+	new_aci->cap_ld_env = LD_inherit;
+	return 0;
 }
 
 static rsbac_list_conv_function_t *cap_fd_get_conv(rsbac_version_t old_version)
@@ -1096,36 +1145,36 @@ static int cap_old_user_conv(void *old_desc,
 
 static int cap_old_old_user_conv(void *old_desc, void *old_data, void *new_desc, void *new_data)
 {
-        rsbac_uid_t *new_user = new_desc;
-        rsbac_old_uid_t *old_user = old_desc;
-        struct rsbac_cap_user_aci_t *new_aci = new_data;
-        struct rsbac_cap_user_old_old_aci_t *old_aci = old_data;
+	rsbac_uid_t *new_user = new_desc;
+	rsbac_old_uid_t *old_user = old_desc;
+	struct rsbac_cap_user_aci_t *new_aci = new_data;
+	struct rsbac_cap_user_old_old_aci_t *old_aci = old_data;
 
-        *new_user = RSBAC_GEN_UID(0,*old_user);
+	*new_user = RSBAC_GEN_UID(0,*old_user);
 	new_aci->cap_role = old_aci->cap_role;
 	new_aci->min_caps.cap[0] = old_aci->min_caps;
 	new_aci->max_caps.cap[0] = old_aci->max_caps;
 	new_aci->min_caps.cap[1] = (__u32) 0;
 	new_aci->max_caps.cap[1] = (__u32) -1;
 	new_aci->cap_ld_env = old_aci->cap_ld_env;
-        return 0;
+	return 0;
 }
 
 static int cap_old_old_old_user_conv(void *old_desc, void *old_data, void *new_desc, void *new_data)
 {
-        rsbac_uid_t *new_user = new_desc;
-        rsbac_old_uid_t *old_user = old_desc;
-        struct rsbac_cap_user_aci_t *new_aci = new_data;
-        struct rsbac_cap_user_old_old_aci_t *old_aci = old_data;
+	rsbac_uid_t *new_user = new_desc;
+	rsbac_old_uid_t *old_user = old_desc;
+	struct rsbac_cap_user_aci_t *new_aci = new_data;
+	struct rsbac_cap_user_old_old_aci_t *old_aci = old_data;
 
-        *new_user = RSBAC_GEN_UID(0,*old_user);
+	*new_user = RSBAC_GEN_UID(0,*old_user);
 	new_aci->cap_role = old_aci->cap_role;
 	new_aci->min_caps.cap[0] = old_aci->min_caps;
 	new_aci->max_caps.cap[0] = old_aci->max_caps;
 	new_aci->min_caps.cap[1] = (__u32) 0;
 	new_aci->max_caps.cap[1] = (__u32) -1;
 	new_aci->cap_ld_env = LD_allow;
-        return 0;
+	return 0;
 }
 
 static rsbac_list_conv_function_t *cap_user_get_conv(rsbac_version_t old_version)
@@ -1192,7 +1241,7 @@ static int net_temp_old_conv(void *old_desc, void *old_data, void *new_desc, voi
 	struct rsbac_net_temp_data_t *new_aci = new_data;
 	struct rsbac_net_temp_old_data_t *old_aci = old_data;
 
-        memcpy(new_desc, old_desc, sizeof(rsbac_net_temp_id_t));
+	memcpy(new_desc, old_desc, sizeof(rsbac_net_temp_id_t));
 	new_aci->address_family = old_aci->address_family;
 	new_aci->type = old_aci->type;
 	new_aci->protocol = old_aci->protocol;
@@ -2372,7 +2421,7 @@ static void remove_device_item(__u32 major, __u32 minor)
 {
 	struct rsbac_device_list_item_t *item_p;
 	u_int hash;
-               
+      
 	hash = device_hash(minor);
 	if ((item_p = lookup_device_locked(major, minor, hash))) {
 		struct rsbac_device_list_head_t * new_p;
@@ -2456,7 +2505,10 @@ long rsbac_read_open(char *name, __u32 major, __u32 minor)
 {
 	long dir_fd;
 	long file_fd;
-	mm_segment_t oldfs;
+	struct open_how how = build_open_how(O_RDONLY, 0);
+	struct open_flags op;
+	struct file * f2;
+	struct filename *fname;
 
 	dir_fd = rsbac_aci_path_open(major, minor, FALSE);
 	if (dir_fd < 0) {
@@ -2465,41 +2517,111 @@ long rsbac_read_open(char *name, __u32 major, __u32 minor)
 		return -RSBAC_ENOTFOUND;
 	}
 
-	oldfs = get_fs();
-	set_fs(KERNEL_DS);
-
-	file_fd = do_sys_open(dir_fd, name, O_RDONLY, 0);
-	if (file_fd < 0) {
+	file_fd = build_open_flags(&how, &op);
+	file_fd = get_unused_fd_flags(how.flags);
+	fname = getname_kernel(name);
+	f2 = do_filp_open(dir_fd, fname, &op);
+	putname(fname);
+	if (IS_ERR(f2)) {
 		/* file not found: trying backup */
 		char *bname;
 		int name_len = strlen(name);
 
 		bname = rsbac_kmalloc(name_len + 2);
 		if (!bname) {
-			file_fd = -RSBAC_ENOMEM;
-			goto out;
+			rsbac_aci_path_close(dir_fd);
+			put_unused_fd(file_fd);
+			return -RSBAC_ENOMEM;
 		}
-
 		strcpy(bname, name);
 		bname[name_len] = 'b';
 		name_len++;
 		bname[name_len] = (char) 0;
 		rsbac_pr_debug(ds, "could not lookup file %s, trying backup %s\n",
 			     name, bname);
+		fname = getname_kernel(bname);
+		f2 = do_filp_open(dir_fd, fname, &op);
+		putname(fname);
+	}
+	rsbac_aci_path_close(dir_fd);
+	if (!IS_ERR(f2)) {
+		fsnotify_open(f2);
+		fd_install(file_fd, f2);
+		return file_fd;
+	}
+	put_unused_fd(file_fd);
+	return PTR_ERR(f2);
+}
 
-		file_fd = do_sys_open(dir_fd, bname, O_RDONLY, 0);
-		rsbac_kfree(bname);
-		if (file_fd < 0) {
-			/* backup file also not found: return error */
-			rsbac_pr_debug(ds, "backup file %sb not found\n",
-				       name);
-		}
+static int rsbac_rename(int dir_fd, const char * name)
+{
+	struct dentry * dir_dentry;
+	struct dentry * old_dentry;
+	struct dentry * new_dentry;
+	struct inode *delegated_inode = NULL;
+	struct file *file;
+	struct fdtable *fdt;
+	int error;
+	char bname[RSBAC_MAXNAMELEN];
+	const u_int name_len = strlen(name);
+
+	if (name_len > RSBAC_MAXNAMELEN - 2) {
+		rsbac_pr_debug(ds, "rsbac_rename(): name %s too long, no rename possible\n",
+				name);
+		return 0;
 	}
 
-out:
-	set_fs(oldfs);
-	rsbac_aci_path_close(dir_fd);
-	return file_fd;
+	spin_lock(&current->files->file_lock);
+	fdt = files_fdtable(current->files);
+	file = fdt->fd[dir_fd];
+	spin_unlock(&current->files->file_lock);
+	if (!file) {
+		rsbac_pr_debug(ds, "rsbac_rename(): dir_fd not found, no rename possible\n");
+		return -RSBAC_ENOTFOUND;
+	}
+
+	dir_dentry = file->f_path.dentry;
+
+	inode_lock(dir_dentry->d_inode);
+	old_dentry = lookup_one_len(name,
+				 dir_dentry,
+				 strlen(name));
+	if (!old_dentry || IS_ERR(dir_dentry)) {
+		inode_unlock(dir_dentry->d_inode);
+		rsbac_pr_debug(ds, "rsbac_rename(): old name %s not found, no rename needed\n",
+				name);
+		return 0;
+	}
+	if (!old_dentry->d_inode) {
+		inode_unlock(dir_dentry->d_inode);
+		dput(old_dentry);
+		rsbac_pr_debug(ds, "rsbac_rename(): old name %s found without inode, no rename needed\n",
+				name);
+		return 0;
+	}
+	strcpy(bname, name);
+	bname[name_len] = 'b';
+	bname[name_len + 1] = (char) 0;
+	new_dentry = lookup_one_len(bname,
+				 dir_dentry,
+				 strlen(bname));
+	if (!new_dentry || IS_ERR(new_dentry)) {
+		inode_unlock(dir_dentry->d_inode);
+		dput(old_dentry);
+		rsbac_pr_debug(ds, "rsbac_rename(): new name %s not found, no rename possible\n",
+				bname);
+		return -RSBAC_ENOTFOUND;
+	}
+
+	error = vfs_rename(dir_dentry->d_inode, old_dentry,
+			   dir_dentry->d_inode, new_dentry,
+			   &delegated_inode, 0);
+
+	inode_unlock(dir_dentry->d_inode);
+	dput(old_dentry);
+	dput(new_dentry);
+
+	return error;
 }
 
 #if defined(CONFIG_RSBAC_REG)
@@ -2509,7 +2631,10 @@ long rsbac_write_open(char *name, __u32 major, __u32 minor)
 {
 	long dir_fd;
 	long file_fd;
-	mm_segment_t oldfs;
+	struct open_how how = build_open_how(O_RDONLY, 0);
+	struct open_flags op;
+	struct file * f2;
+	struct filename *fname;
 
 	dir_fd = rsbac_aci_path_open(major, minor, TRUE);
 	if (dir_fd < 0) {
@@ -2521,41 +2646,28 @@ long rsbac_write_open(char *name, __u32 major, __u32 minor)
 		return -RSBAC_ENOTWRITABLE;
 	}
 
-	oldfs = get_fs();
-	set_fs(KERNEL_DS);
-
-	file_fd = do_sys_open(dir_fd, name, O_RDONLY, 0);
-	if (file_fd >= 0) {
-		char bname[RSBAC_MAXNAMELEN];
-		u_int name_len = strlen(name);
-
-		ksys_close(file_fd);
-		if (name_len <= RSBAC_MAXNAMELEN - 2) {
-			strcpy(bname, name);
-			bname[name_len] = 'b';
-			bname[name_len + 1] = (char) 0;
-			rsbac_pr_debug(ds, "renaming old file %s on %02u:%02u to %s\n",
-					name, major, minor, bname);
-			file_fd = do_renameat2(dir_fd, name, dir_fd, bname, 0);
-			if (file_fd < 0) {
-				rsbac_printk(KERN_WARNING "rsbac_write_open(): failed to rename old file %s on device %02u:%02u to backup %s, error %li\n",
-					name, major, minor, bname, file_fd);
-			}
-		} else {
-			rsbac_printk(KERN_WARNING "rsbac_write_open(): failed to rename old file %s on device %02u:%02u to backup %sb, because name is too long\n",
-				name, major, minor, name);
-		}
-	}
-
-	file_fd = do_sys_open(dir_fd, name, O_RDWR | O_CREAT | O_TRUNC, 0);
+	file_fd = rsbac_rename(dir_fd, name);
 	if (file_fd < 0) {
-		rsbac_printk(KERN_WARNING "rsbac_write_open(): failed to open file %s on device %02u:%02u for writing, error %li\n",
-			name, major, minor, file_fd);
+		rsbac_printk(KERN_WARNING "rsbac_write_open(): failed to rename old file %s on device %02u:%02u to backup %sb, error %li\n",
+			name, major, minor, name, file_fd);
 	}
 
-	set_fs(oldfs);
+	how = build_open_how(O_RDWR | O_CREAT | O_TRUNC, 0);
+	file_fd = build_open_flags(&how, &op);
+	file_fd = get_unused_fd_flags(how.flags);
+	fname = getname_kernel(name);
+	f2 = do_filp_open(dir_fd, fname, &op);
+	putname(fname);
 	rsbac_aci_path_close(dir_fd);
-	return file_fd;
+	if (!IS_ERR(f2)) {
+		fsnotify_open(f2);
+		fd_install(file_fd, f2);
+		return file_fd;
+	}
+	rsbac_printk(KERN_WARNING "rsbac_write_open(): failed to open file %s on device %02u:%02u for writing, error %li\n",
+			name, major, minor, PTR_ERR(f2));
+	put_unused_fd(file_fd);
+	return PTR_ERR(f2);
 }
 
 #if defined(CONFIG_RSBAC_REG)
@@ -2577,33 +2689,61 @@ void rsbac_write_close(unsigned int fd)
 #if defined(CONFIG_RSBAC_REG)
 EXPORT_SYMBOL(rsbac_read_file);
 #endif
-/* in KERNEL_DS, so buf must point to kernel space */
+/* buf must point to kernel space */
 ssize_t rsbac_read_file(unsigned int fd, char *buf, size_t count)
 {
-	ssize_t err;
-	mm_segment_t oldfs;
+	struct fd f = fdget_pos(fd);
+	ssize_t ret = -EBADF;
 
-	oldfs = get_fs();
-	set_fs(KERNEL_DS);
-	err = ksys_read(fd, buf, count);
-	set_fs(oldfs);
-	return err;
+	if (f.file) {
+		loff_t pos;
+		loff_t *ppos;
+
+		if (!(f.file->f_mode & FMODE_READ))
+			return -EBADF;
+		if (!(f.file->f_mode & FMODE_CAN_READ))
+			return -EINVAL;
+		ppos = &f.file->f_pos;
+		if (ppos) {
+			pos = *ppos;
+			ppos = &pos;
+		}
+		ret = kernel_read(f.file, buf, count, ppos);
+		if (ret >= 0 && ppos)
+			f.file->f_pos = pos;
+		fdput_pos(f);
+	}
+	return ret;
 }
 
 #if defined(CONFIG_RSBAC_REG)
 EXPORT_SYMBOL(rsbac_write_file);
 #endif
-/* in KERNEL_DS, so buf must point to kernel space */
+/* buf must point to kernel space */
 ssize_t rsbac_write_file(unsigned int fd, const char *buf, size_t count)
 {
-	ssize_t err;
-	mm_segment_t oldfs;
+	struct fd f = fdget_pos(fd);
+	ssize_t ret = -EBADF;
 
-	oldfs = get_fs();
-	set_fs(KERNEL_DS);
-	err = ksys_write(fd, buf, count);
-	set_fs(oldfs);
-	return err;
+	if (f.file) {
+		loff_t pos;
+		loff_t *ppos;
+
+		if (!(f.file->f_mode & FMODE_WRITE))
+			return -EBADF;
+		if (!(f.file->f_mode & FMODE_CAN_WRITE))
+			return -EINVAL;
+		ppos = &f.file->f_pos;
+		if (ppos) {
+			pos = *ppos;
+			ppos = &pos;
+		}
+		ret = kernel_write(f.file, buf, count, ppos);
+		if (ret >= 0 && ppos)
+			f.file->f_pos = pos;
+		fdput_pos(f);
+	}
+	return ret;
 }
 
 
@@ -2694,7 +2834,7 @@ int rsbac_lookup_full_path(struct dentry *dentry_p, char path[], int maxlen, int
 			    && device_p->vfsmount_p
 			    && real_mount(device_p->vfsmount_p)->mnt_mountpoint
 			    && real_mount(device_p->vfsmount_p)->mnt_mountpoint->d_sb
-		            && (real_mount(device_p->vfsmount_p)->mnt_mountpoint->d_sb->s_dev != dentry_p->d_sb->s_dev)
+			    && (real_mount(device_p->vfsmount_p)->mnt_mountpoint->d_sb->s_dev != dentry_p->d_sb->s_dev)
 			   ) {
 				dentry_p = real_mount(device_p->vfsmount_p)->mnt_mountpoint;
 				srcu_read_unlock(&device_list_srcu[hash], srcu_idx);
@@ -2777,12 +2917,11 @@ static int devices_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, devices_proc_show, NULL);
 }
 
-static const struct file_operations devices_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = devices_proc_open,
-       .read           = seq_read,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops devices_proc_ops = {
+       .proc_open           = devices_proc_open,
+       .proc_read           = seq_read,
+       .proc_lseek          = seq_lseek,
+       .proc_release        = single_release,
 };
 
 static struct proc_dir_entry *devices;
@@ -3289,12 +3428,11 @@ static int stats_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, stats_proc_show, NULL);
 }
 
-static const struct file_operations stats_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = stats_proc_open,
-       .read           = seq_read,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops stats_proc_ops = {
+       .proc_open           = stats_proc_open,
+       .proc_read           = seq_read,
+       .proc_lseek          = seq_lseek,
+       .proc_release        = single_release,
 };
 
 static struct proc_dir_entry *stats;
@@ -3569,12 +3707,11 @@ static int active_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, active_proc_show, NULL);
 }
 
-static const struct file_operations active_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = active_proc_open,
-       .read           = seq_read,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops active_proc_ops = {
+       .proc_open           = active_proc_open,
+       .proc_read           = seq_read,
+       .proc_lseek          = seq_lseek,
+       .proc_release        = single_release,
 };
 
 static struct proc_dir_entry *active;
@@ -3686,7 +3823,7 @@ xstats_proc_show(struct seq_file *m, void *v)
 		rsbac_get_syscall_name(name, i);
 		name[30] = 0;
 		seq_printf(m, "%-26s %llu\n",
-		               name, syscall_count[i]);
+			name, syscall_count[i]);
 	}
 
 	seq_printf(m,
@@ -3799,12 +3936,11 @@ static int xstats_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, xstats_proc_show, NULL);
 }
 
-static const struct file_operations xstats_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = xstats_proc_open,
-       .read           = seq_read,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops xstats_proc_ops = {
+       .proc_open           = xstats_proc_open,
+       .proc_read           = seq_read,
+       .proc_lseek          = seq_lseek,
+       .proc_release        = single_release,
 };
 
 static struct proc_dir_entry *xstats;
@@ -3948,13 +4084,12 @@ static ssize_t auto_write_proc_write(struct file *file,
 	return err;
 }
 
-static const struct file_operations auto_write_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = auto_write_proc_open,
-       .read           = seq_read,
-       .llseek         = seq_lseek,
-       .release        = single_release,
-       .write          = auto_write_proc_write,
+static const struct proc_ops auto_write_proc_ops = {
+       .proc_open           = auto_write_proc_open,
+       .proc_read           = seq_read,
+       .proc_lseek          = seq_lseek,
+       .proc_release        = single_release,
+       .proc_write          = auto_write_proc_write,
 };
 
 static struct proc_dir_entry *auto_write;
@@ -4221,12 +4356,11 @@ static int versions_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, versions_proc_show, NULL);
 }
 
-static const struct file_operations versions_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = versions_proc_open,
-       .read           = seq_read,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops versions_proc_ops = {
+       .proc_open           = versions_proc_open,
+       .proc_read           = seq_read,
+       .proc_lseek          = seq_lseek,
+       .proc_release        = single_release,
 };
 
 static struct proc_dir_entry *versions;
@@ -4281,12 +4415,11 @@ static int net_temp_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, net_temp_proc_show, NULL);
 }
 
-static const struct file_operations net_temp_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = net_temp_proc_open,
-       .read           = seq_read,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops net_temp_proc_ops = {
+       .proc_open           = net_temp_proc_open,
+       .proc_read           = seq_read,
+       .proc_lseek          = seq_lseek,
+       .proc_release        = single_release,
 };
 
 static struct proc_dir_entry *net_temp;
@@ -4376,12 +4509,11 @@ static int jails_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, jails_proc_show, NULL);
 }
 
-static const struct file_operations jails_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = jails_proc_open,
-       .read           = seq_read,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops jails_proc_ops = {
+       .proc_open           = jails_proc_open,
+       .proc_read           = seq_read,
+       .proc_lseek          = seq_lseek,
+       .proc_release        = single_release,
 };
 
 static struct proc_dir_entry *jails;
@@ -4403,21 +4535,21 @@ static int register_all_rsbac_proc(void)
 	if (!proc_rsbac_backup_p)
 		return -RSBAC_ECOULDNOTADDITEM;
 
-	devices = proc_create("devices",  S_IFREG | S_IRUGO, proc_rsbac_root_p, &devices_proc_fops);
-	stats = proc_create("stats", S_IFREG | S_IRUGO, proc_rsbac_root_p, &stats_proc_fops);
-	active = proc_create("active", S_IFREG | S_IRUGO, proc_rsbac_root_p, &active_proc_fops);
+	devices = proc_create("devices",  S_IFREG | S_IRUGO, proc_rsbac_root_p, &devices_proc_ops);
+	stats = proc_create("stats", S_IFREG | S_IRUGO, proc_rsbac_root_p, &stats_proc_ops);
+	active = proc_create("active", S_IFREG | S_IRUGO, proc_rsbac_root_p, &active_proc_ops);
 #ifdef CONFIG_RSBAC_XSTATS
-	xstats = proc_create("xstats", S_IFREG | S_IRUGO, proc_rsbac_root_p, &xstats_proc_fops);
+	xstats = proc_create("xstats", S_IFREG | S_IRUGO, proc_rsbac_root_p, &xstats_proc_ops);
 #endif
 #if defined(CONFIG_RSBAC_AUTO_WRITE)
-	auto_write = proc_create("auto_write", S_IFREG | S_IRUGO | S_IWUGO, proc_rsbac_root_p, &auto_write_proc_fops);
+	auto_write = proc_create("auto_write", S_IFREG | S_IRUGO | S_IWUGO, proc_rsbac_root_p, &auto_write_proc_ops);
 #endif
-	versions = proc_create("versions", S_IFREG | S_IRUGO, proc_rsbac_root_p, &versions_proc_fops);
+	versions = proc_create("versions", S_IFREG | S_IRUGO, proc_rsbac_root_p, &versions_proc_ops);
 #ifdef CONFIG_RSBAC_NET_OBJ
-	net_temp = proc_create("net_temp", S_IFREG | S_IRUGO, proc_rsbac_root_p, &net_temp_proc_fops);
+	net_temp = proc_create("net_temp", S_IFREG | S_IRUGO, proc_rsbac_root_p, &net_temp_proc_ops);
 #endif
 #ifdef CONFIG_RSBAC_JAIL
-	jails = proc_create("jails", S_IFREG | S_IRUGO, proc_rsbac_root_p, &jails_proc_fops);
+	jails = proc_create("jails", S_IFREG | S_IRUGO, proc_rsbac_root_p, &jails_proc_ops);
 #endif
 
 	return 0;
@@ -7001,13 +7133,13 @@ int __init rsbac_init(rsbac_dev_t root_dev)
 #ifdef CONFIG_RSBAC_MAC
 	if (rsbac_list_add(process_handles.mac, &init_pid, &mac_init_p_aci))
 		rsbac_printk(KERN_WARNING "rsbac_do_init(): MAC ACI for \"init\" process could not be added!");
-        if (rsbac_list_add(process_handles.mac, &rsbacd_pid, &mac_init_p_aci))
+	if (rsbac_list_add(process_handles.mac, &rsbacd_pid, &mac_init_p_aci))
 		rsbac_printk(KERN_WARNING "rsbac_do_init(): MAC ACI for \"rsbacd\" process could not be added!");
 #endif
 #ifdef CONFIG_RSBAC_RC
 	if (rsbac_list_add(process_handles.rc, &init_pid, &rc_init_p_aci))
 		rsbac_printk(KERN_WARNING "rsbac_do_init(): RC ACI for \"init\" process could not be added");
-        if (rsbac_list_add(process_handles.rc, &rsbacd_pid, &rc_kernel_p_aci))
+	if (rsbac_list_add(process_handles.rc, &rsbacd_pid, &rc_kernel_p_aci))
 		rsbac_printk(KERN_WARNING "rsbac_do_init(): RC ACI for \"rsbacd\" process could not be added");
 #endif
 	
@@ -7291,8 +7423,8 @@ int rsbac_mount(struct vfsmount * vfsmount_p, struct vfsmount * vfsmount_parent_
 		if (!device_p->vfsmount_p)
 			device_p->vfsmount_p = mntget(vfsmount_p);
 		else
-		        if (   real_mount(device_p->vfsmount_p)->mnt_mountpoint
-		            && (real_mount(device_p->vfsmount_p)->mnt_mountpoint->d_sb->s_dev == device_p->vfsmount_p->mnt_sb->s_dev)
+			if (   real_mount(device_p->vfsmount_p)->mnt_mountpoint
+			    && (real_mount(device_p->vfsmount_p)->mnt_mountpoint->d_sb->s_dev == device_p->vfsmount_p->mnt_sb->s_dev)
 		    	   ) {
 #if defined(CONFIG_RSBAC_AUTO_WRITE)
 				spin_lock(&rsbac_write_lock);
@@ -7310,7 +7442,7 @@ int rsbac_mount(struct vfsmount * vfsmount_p, struct vfsmount * vfsmount_parent_
 #if defined(CONFIG_RSBAC_AUTO_WRITE)
 				write_blocked = FALSE;
 #endif
-		        }
+			}
 		srcu_read_unlock(&device_list_srcu[hash], srcu_idx);
 	} else {
 		srcu_read_unlock(&device_list_srcu[hash], srcu_idx);
@@ -8071,8 +8203,8 @@ static int get_attr_fd(rsbac_list_ta_number_t ta_number,
 				char * attr_val_name = NULL;
 
 				if (rsbac_debug_fdcache) {
-				        attr_name = rsbac_kmalloc(32);
-				        attr_val_name = rsbac_kmalloc(RSBAC_MAXNAMELEN);
+					attr_name = rsbac_kmalloc(32);
+					attr_val_name = rsbac_kmalloc(RSBAC_MAXNAMELEN);
 				}
 				if (rsbac_debug_fdcache > 1)
 					rsbac_pr_debug(fdcache, "Found fd cache item device %02u:%02u inode %lu module %u attr %s value %s\n",
@@ -8644,7 +8776,7 @@ static int get_attr_fd(rsbac_list_ta_number_t ta_number,
 				switch (attr) {
 				case A_min_caps:
 					value_p->min_caps.cap[0] = aci.min_caps.cap[0];
-                                        value_p->min_caps.cap[1] = aci.min_caps.cap[1];
+					value_p->min_caps.cap[1] = aci.min_caps.cap[1];
 					break;
 				case A_max_caps:
 					value_p->max_caps.cap[0] = aci.max_caps.cap[0];
@@ -8812,8 +8944,8 @@ static int get_attr_fd(rsbac_list_ta_number_t ta_number,
 			char * attr_name = NULL;
 			char * attr_val_name = NULL;
 			if (rsbac_debug_fdcache) {
-			        attr_name = rsbac_kmalloc(32);
-			        attr_val_name = rsbac_kmalloc(RSBAC_MAXNAMELEN);
+				attr_name = rsbac_kmalloc(32);
+				attr_val_name = rsbac_kmalloc(RSBAC_MAXNAMELEN);
 			}
 #endif
 			if (!RSBAC_IS_ZERO_DEV(firstdev_major, firstdev_minor)) {
@@ -9690,8 +9822,8 @@ static int get_attr_process(rsbac_list_ta_number_t ta_number,
 				value->rc_type = aci.rc_type;
 				break;
 			case A_rc_select_type:
-			        value->rc_select_type = aci.rc_select_type;
-			        break;
+				value->rc_select_type = aci.rc_select_type;
+				break;
 			case A_rc_force_role:
 				value->rc_force_role = aci.rc_force_role;
 				break;
@@ -11098,15 +11230,15 @@ static int set_attr_fd(rsbac_list_ta_number_t ta_number,
 			case A_min_caps:
 				if ((aci.min_caps.cap[0] != value_p->min_caps.cap[0]) || (aci.min_caps.cap[1] != value_p->min_caps.cap[1])) {
 					aci.min_caps.cap[0] = value_p->min_caps.cap[0];
-	                                aci.min_caps.cap[1] = value_p->min_caps.cap[1];
-	                                need_set = 1;
+					aci.min_caps.cap[1] = value_p->min_caps.cap[1];
+					need_set = 1;
 				}
 				break;
 			case A_max_caps:
 				if ((aci.max_caps.cap[0] != value_p->max_caps.cap[0]) || (aci.max_caps.cap[1] != value_p->max_caps.cap[1])) {
 					aci.max_caps.cap[0] = value_p->max_caps.cap[0];
-	                                aci.max_caps.cap[1] = value_p->max_caps.cap[1];
-	                                need_set = 1;
+					aci.max_caps.cap[1] = value_p->max_caps.cap[1];
+					need_set = 1;
 				}
 				break;
 			case A_cap_ld_env:
@@ -11250,8 +11382,8 @@ static int set_attr_fd(rsbac_list_ta_number_t ta_number,
 		char * attr_name = NULL;
 		char * attr_val_name = NULL;
 		if (rsbac_debug_fdcache) {
-		        attr_name = rsbac_kmalloc(32);
-		        attr_val_name = rsbac_kmalloc(RSBAC_MAXNAMELEN);
+			attr_name = rsbac_kmalloc(32);
+			attr_val_name = rsbac_kmalloc(RSBAC_MAXNAMELEN);
 		}
 #endif
 		rsbac_pr_debug(fdcache, "Invalidating fd cache item device %02u:%02u inode %lu, module %u, attr %s, new value %s\n",
@@ -12046,8 +12178,8 @@ static int set_attr_process(rsbac_list_ta_number_t ta_number,
 				aci.rc_type = value_p->rc_type;
 				break;
 			case A_rc_select_type:
-			        aci.rc_select_type = value_p->rc_select_type;
-			        break;
+				aci.rc_select_type = value_p->rc_select_type;
+				break;
 			case A_rc_force_role:
 				aci.rc_force_role = value_p->rc_force_role;
 				break;
@@ -12844,7 +12976,7 @@ int rsbac_ta_remove_target(rsbac_list_ta_number_t ta_number,
 		/* free access to device_list_head */
 		srcu_read_unlock(&device_list_srcu[hash], srcu_idx);
 #ifdef CONFIG_RSBAC_FD_CACHE
-                rsbac_pr_debug(fdcache, "removed FD item device %02u:%02u inode %lu, invalidate cache item\n",
+		rsbac_pr_debug(fdcache, "removed FD item device %02u:%02u inode %lu, invalidate cache item\n",
 				major, minor, tid.file.inode);
 		rsbac_fd_cache_invalidate(&tid.file);
 #endif
@@ -12852,52 +12984,51 @@ int rsbac_ta_remove_target(rsbac_list_ta_number_t ta_number,
 
 	case T_DEV:
 		{
-                  switch (tid.dev.type)
-                    {
-                      case D_block:
-                      case D_char:
-                        rsbac_ta_list_remove(ta_number,
-                                         dev_handles.gen,
-                                         &tid.dev);
+			switch (tid.dev.type) {
+				case D_block:
+				case D_char:
+					rsbac_ta_list_remove(ta_number,
+							dev_handles.gen,
+							&tid.dev);
 #if defined(CONFIG_RSBAC_MAC)
-                        rsbac_ta_list_remove(ta_number,
-                                         dev_handles.mac,
-                                         &tid.dev);
+					rsbac_ta_list_remove(ta_number,
+							dev_handles.mac,
+							&tid.dev);
 #endif
 #if defined(CONFIG_RSBAC_RC)
-                        rsbac_ta_list_remove(ta_number,
-                                         dev_handles.rc,
-                                         &tid.dev);
+					rsbac_ta_list_remove(ta_number,
+							dev_handles.rc,
+							&tid.dev);
 #endif
-                        break;
-                      case D_block_major:
-                      case D_char_major:
-                        {
-                          enum rsbac_dev_type_t orig_devtype=tid.dev.type;
+					break;
+				case D_block_major:
+				case D_char_major:
+					{
+						enum rsbac_dev_type_t orig_devtype=tid.dev.type;
 
-                          if (tid.dev.type==D_block_major)    
-                            tid.dev.type=D_block;
-                          else
-                            tid.dev.type=D_char;
-                          rsbac_ta_list_remove(ta_number,
-                                           dev_major_handles.gen,
-                                           &tid.dev);
+						if (tid.dev.type==D_block_major)    
+							tid.dev.type=D_block;
+						else
+							tid.dev.type=D_char;
+						rsbac_ta_list_remove(ta_number,
+								dev_major_handles.gen,
+								&tid.dev);
 #if defined(CONFIG_RSBAC_MAC)
-                          rsbac_ta_list_remove(ta_number,
-                                           dev_major_handles.mac,
-                                           &tid.dev);
+						rsbac_ta_list_remove(ta_number,
+								dev_major_handles.mac,
+								&tid.dev);
 #endif
 #if defined(CONFIG_RSBAC_RC)
-                          rsbac_ta_list_remove(ta_number,
-                                           dev_major_handles.rc,
-                                           &tid.dev);
+						rsbac_ta_list_remove(ta_number,
+								dev_major_handles.rc,
+								&tid.dev);
 #endif
-                          tid.dev.type=orig_devtype;
-                          break;
-                        }
-                      default:
-                        return -RSBAC_EINVALIDTARGET;
-                    }
+						tid.dev.type=orig_devtype;
+						break;
+					}
+				default:
+					return -RSBAC_EINVALIDTARGET;
+			}
 		}
 		break;
 
