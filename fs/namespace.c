@@ -31,6 +31,8 @@
 #include <linux/fs_context.h>
 #include <linux/shmem_fs.h>
 
+#include <rsbac/hooks.h>
+
 #include "pnode.h"
 #include "internal.h"
 
@@ -254,6 +256,13 @@ out_free_cache:
  */
 bool __mnt_is_readonly(struct vfsmount *mnt)
 {
+#ifdef CONFIG_RSBAC
+	/* HACK - Remove me when switching to full 2.6, pass over the vfsmount
+	 * in init_private_file() instead
+	 */
+	if(!mnt)
+		return 0;
+#endif
 	return (mnt->mnt_flags & MNT_READONLY) || sb_rdonly(mnt->mnt_sb);
 }
 EXPORT_SYMBOL_GPL(__mnt_is_readonly);
@@ -321,6 +330,14 @@ int __mnt_want_write(struct vfsmount *m)
 {
 	struct mount *mnt = real_mount(m);
 	int ret = 0;
+
+#ifdef CONFIG_RSBAC
+	/* HACK - Remove me when switching to full 2.6, pass over the vfsmount
+	 * in init_private_file() instead
+	 */
+	if(!mnt)
+		return 0;
+#endif
 
 	preempt_disable();
 	mnt_inc_writers(mnt);
@@ -436,6 +453,14 @@ EXPORT_SYMBOL_GPL(mnt_want_write_file);
  */
 void __mnt_drop_write(struct vfsmount *mnt)
 {
+#ifdef CONFIG_RSBAC
+	/* HACK - Remove me when switching to full 2.6, pass over the vfsmount
+	 * in init_private_file() instead
+	 */
+	if(!mnt)
+		return;
+#endif
+
 	preempt_disable();
 	mnt_dec_writers(real_mount(mnt));
 	preempt_enable();
@@ -971,6 +996,9 @@ struct vfsmount *vfs_create_mount(struct fs_context *fc)
 	mnt->mnt_mountpoint	= mnt->mnt.mnt_root;
 	mnt->mnt_parent		= mnt;
 
+#ifdef CONFIG_RSBAC
+	rsbac_mount(&mnt->mnt, mnt_has_parent(mnt) ? &mnt->mnt_parent->mnt : NULL);
+#endif
 	lock_mount_hash();
 	list_add_tail(&mnt->mnt_instance, &mnt->mnt.mnt_sb->s_mounts);
 	unlock_mount_hash();
@@ -1566,6 +1594,11 @@ static int do_umount(struct mount *mnt, int flags)
 	struct super_block *sb = mnt->mnt.mnt_sb;
 	int retval;
 
+#ifdef CONFIG_RSBAC
+	union rsbac_target_id_t rsbac_target_id;
+	union rsbac_attribute_value_t rsbac_attribute_value;
+#endif
+
 	retval = security_sb_umount(&mnt->mnt, flags);
 	if (retval)
 		return retval;
@@ -1595,6 +1628,44 @@ static int do_umount(struct mount *mnt, int flags)
 		if (!xchg(&mnt->mnt_expiry_mark, 1))
 			return -EAGAIN;
 	}
+
+#ifdef CONFIG_RSBAC
+	rsbac_pr_debug(aef, "calling ADF for DIR\n");
+	rsbac_target_id.dir.device = sb->s_root->d_sb->s_dev;
+	rsbac_target_id.dir.inode  = sb->s_root->d_inode->i_ino;
+	rsbac_target_id.dir.dentry_p = sb->s_root;
+	rsbac_attribute_value.dummy = 0;
+	if (!rsbac_adf_request(R_UMOUNT,
+				task_pid(current),
+				T_DIR,
+				rsbac_target_id,
+				A_none,
+				rsbac_attribute_value)) {
+		return -EPERM;
+	}
+	rsbac_pr_debug(aef, "calling ADF for dev\n");
+	rsbac_target_id.dev.type = D_block;
+	rsbac_target_id.dev.major = RSBAC_MAJOR(sb->s_dev);
+	rsbac_target_id.dev.minor = RSBAC_MINOR(sb->s_dev);
+	rsbac_attribute_value.dummy = 0;
+	if (!rsbac_adf_request(R_UMOUNT,
+				task_pid(current),
+				T_DEV,
+				rsbac_target_id,
+				A_none,
+				rsbac_attribute_value)) {
+		return -EPERM;
+	}
+#endif
+
+        /* RSBAC: removing data structures for this fs from memory (not /) */
+#ifdef CONFIG_RSBAC
+	if ((&mnt->mnt != current->fs->root.mnt) || (flags & MNT_DETACH)) {
+		rsbac_pr_debug(ds, "[sys_umount()]: calling rsbac_umount for Device %02u:%02u\n",
+				MAJOR(sb->s_dev), MINOR(sb->s_dev));
+		rsbac_umount(&mnt->mnt);
+	}
+#endif
 
 	/*
 	 * If we may have to abort operations to get out of this
@@ -1654,6 +1725,17 @@ static int do_umount(struct mount *mnt, int flags)
 	}
 out:
 	unlock_mount_hash();
+
+#ifdef CONFIG_RSBAC
+	/* RSBAC: umount failed, so reread data structures for this fs from disk */
+	if(retval) {
+		rsbac_printk(KERN_WARNING
+				"do_umount() [sys_umount()]: umount failed -> calling rsbac_mount for Device %02u:%02u\n",
+				MAJOR(mnt->mnt.mnt_sb->s_dev),MINOR(mnt->mnt.mnt_sb->s_dev));
+		rsbac_mount(&mnt->mnt, mnt_has_parent(mnt) ? &mnt->mnt_parent->mnt : NULL);
+	}
+#endif
+
 	namespace_unlock();
 	return retval;
 }
@@ -2384,6 +2466,13 @@ static int do_loopback(struct path *path, const char *old_name,
 	struct mount *mnt = NULL, *parent;
 	struct mountpoint *mp;
 	int err;
+
+#ifdef CONFIG_RSBAC
+	enum  rsbac_target_t rsbac_target = T_NONE;
+	union rsbac_target_id_t rsbac_target_id;
+	union rsbac_attribute_value_t rsbac_attribute_value;
+#endif
+
 	if (!old_name || !*old_name)
 		return -EINVAL;
 	err = kern_path(old_name, LOOKUP_FOLLOW|LOOKUP_AUTOMOUNT, &old_path);
@@ -2401,6 +2490,57 @@ static int do_loopback(struct path *path, const char *old_name,
 	}
 
 	parent = real_mount(path->mnt);
+#ifdef CONFIG_RSBAC
+	rsbac_pr_debug(aef, "[do_loopback() [sys_mount()]]: calling ADF for DIR\n");
+	rsbac_target_id.dir.device = old_path.dentry->d_sb->s_dev;
+	rsbac_target_id.dir.inode  = old_path.dentry->d_inode->i_ino;
+	rsbac_target_id.dir.dentry_p = old_path.dentry;
+	rsbac_attribute_value.mode = recurse;
+	if (!rsbac_adf_request(R_MOUNT,
+				task_pid(current),
+				T_DIR,
+				rsbac_target_id,
+				A_mode,
+				rsbac_attribute_value))
+	{
+		err = -EPERM;
+		goto out2;
+	}
+	rsbac_pr_debug(aef, "[do_mount() [sys_mount()]]: calling ADF for DEV\n");
+	if(S_ISBLK(old_path.dentry->d_inode->i_mode))
+	{
+		rsbac_target = T_DEV;
+		rsbac_target_id.dev.type = D_block;
+		rsbac_target_id.dev.major = RSBAC_MAJOR(old_path.dentry->d_sb->s_dev);
+		rsbac_target_id.dev.minor = RSBAC_MINOR(old_path.dentry->d_sb->s_dev);
+	}
+	else
+		if(S_ISDIR(old_path.dentry->d_inode->i_mode))
+		{
+			rsbac_target = T_DIR;
+			rsbac_target_id.dir.device = old_path.dentry->d_sb->s_dev;
+			rsbac_target_id.dir.inode  = old_path.dentry->d_inode->i_ino;
+			rsbac_target_id.dir.dentry_p = old_path.dentry;
+		}
+		else
+		{
+			rsbac_target = T_FILE;
+			rsbac_target_id.file.device = old_path.dentry->d_sb->s_dev;
+			rsbac_target_id.file.inode  = old_path.dentry->d_inode->i_ino;
+			rsbac_target_id.file.dentry_p = old_path.dentry;
+		}
+	if (!rsbac_adf_request(R_MOUNT,
+				task_pid(current),
+				rsbac_target,
+				rsbac_target_id,
+				A_mode,
+				rsbac_attribute_value))
+	{
+		err = -EPERM;
+		goto out2;
+	}
+#endif
+
 	if (!check_mnt(parent))
 		goto out2;
 
@@ -2420,6 +2560,12 @@ out2:
 	unlock_mount(mp);
 out:
 	path_put(&old_path);
+
+#ifdef CONFIG_RSBAC
+	if (!err)
+		rsbac_mount(&mnt->mnt, mnt_has_parent(mnt) ? &mnt->mnt_parent->mnt : NULL);
+#endif
+
 	return err;
 }
 
@@ -2645,6 +2791,11 @@ static int do_remount(struct path *path, int ms_flags, int sb_flags,
 	struct mount *mnt = real_mount(path->mnt);
 	struct fs_context *fc;
 
+#ifdef CONFIG_RSBAC
+	union rsbac_target_id_t rsbac_target_id;
+	union rsbac_attribute_value_t rsbac_attribute_value;
+#endif
+
 	if (!check_mnt(mnt))
 		return -EINVAL;
 
@@ -2666,6 +2817,34 @@ static int do_remount(struct path *path, int ms_flags, int sb_flags,
 
 	err = parse_monolithic_mount_data(fc, data);
 	if (!err) {
+#ifdef CONFIG_RSBAC
+		rsbac_pr_debug(aef, "[do_mount() [sys_mount()]]: calling ADF for DIR\n");
+		rsbac_target_id.dir.device = path->dentry->d_sb->s_dev;
+		rsbac_target_id.dir.inode  = path->dentry->d_inode->i_ino;
+		rsbac_target_id.dir.dentry_p = path->dentry;
+		rsbac_attribute_value.mode = ms_flags;
+		if (!rsbac_adf_request(R_MOUNT,
+					task_pid(current),
+					T_DIR,
+					rsbac_target_id,
+					A_mode,
+					rsbac_attribute_value)) {
+			return -EPERM;
+		}
+		rsbac_pr_debug(aef, "[do_mount() [sys_mount()]]: calling ADF for DEV\n");
+		rsbac_target_id.dev.type = D_block;
+		rsbac_target_id.dev.major = RSBAC_MAJOR(sb->s_dev);
+		rsbac_target_id.dev.minor = RSBAC_MINOR(sb->s_dev);
+		if (!rsbac_adf_request(R_MOUNT,
+					task_pid(current),
+					T_DEV,
+					rsbac_target_id,
+					A_mode,
+					rsbac_attribute_value)) {
+			return -EPERM;
+		}
+#endif
+
 		down_write(&sb->s_umount);
 		err = -EPERM;
 		if (ns_capable(sb->s_user_ns, CAP_SYS_ADMIN)) {
@@ -2788,6 +2967,11 @@ static int do_move_mount(struct path *old_path, struct path *new_path)
 	struct mountpoint *mp, *old_mp;
 	int err;
 	bool attached;
+#ifdef CONFIG_RSBAC
+	union rsbac_target_id_t rsbac_target_id;
+	union rsbac_attribute_value_t rsbac_attribute_value;
+#endif
+
 
 	mp = lock_mount(new_path);
 	if (IS_ERR(mp))
@@ -2799,6 +2983,61 @@ static int do_move_mount(struct path *old_path, struct path *new_path)
 	attached = mnt_has_parent(old);
 	old_mp = old->mnt_mp;
 	ns = old->mnt_ns;
+
+#ifdef CONFIG_RSBAC
+	rsbac_pr_debug(aef, "[do_mount() [sys_mount()]]: calling ADF for UMOUNT on old DIR\n");
+	rsbac_target_id.dir.device = old_path->dentry->d_sb->s_dev;
+	rsbac_target_id.dir.inode  = old_path->dentry->d_inode->i_ino;
+	rsbac_target_id.dir.dentry_p = old_path->dentry;
+	rsbac_attribute_value.dummy = 0;
+	if (!rsbac_adf_request(R_UMOUNT,
+				task_pid(current),
+				T_DIR,
+				rsbac_target_id,
+				A_none,
+				rsbac_attribute_value))	{
+		err = -EPERM;
+		goto out;
+	}
+	rsbac_pr_debug(aef, "[do_mount() [sys_mount()]]: calling ADF for MOUNT on new DIR\n");
+	rsbac_target_id.dir.device = new_path->dentry->d_sb->s_dev;
+	rsbac_target_id.dir.inode  = new_path->dentry->d_inode->i_ino;
+	rsbac_target_id.dir.dentry_p = new_path->dentry;
+	rsbac_attribute_value.dummy = 0;
+	if (!rsbac_adf_request(R_MOUNT,
+				task_pid(current),
+				T_DIR,
+				rsbac_target_id,
+				A_none,
+				rsbac_attribute_value)) {
+		err = -EPERM;
+		goto out;
+	}
+	rsbac_pr_debug(aef, "[do_mount() [sys_mount()]]: calling ADF for UMOUNT on DEV\n");
+	rsbac_target_id.dev.type = D_block;
+	rsbac_target_id.dev.major = RSBAC_MAJOR(old_path->dentry->d_sb->s_dev);
+	rsbac_target_id.dev.minor = RSBAC_MINOR(old_path->dentry->d_sb->s_dev);
+	if (!rsbac_adf_request(R_UMOUNT,
+				task_pid(current),
+				T_DEV,
+				rsbac_target_id,
+				A_none,
+				rsbac_attribute_value)) {
+		err = -EPERM;
+		goto out;
+	}
+	rsbac_pr_debug(aef, "[do_mount() [sys_mount()]]: calling ADF for MOUNT on DEV\n");
+	if (!rsbac_adf_request(R_MOUNT,
+				task_pid(current),
+				T_DEV,
+				rsbac_target_id,
+				A_none,
+				rsbac_attribute_value)) {
+		err = -EPERM;
+		goto out;
+	}
+#endif
+
 
 	err = -EINVAL;
 	/* The mountpoint must be in our namespace. */
@@ -2842,8 +3081,19 @@ static int do_move_mount(struct path *old_path, struct path *new_path)
 
 	err = attach_recursive_mnt(old, real_mount(new_path->mnt), mp,
 				   attached);
-	if (err)
+	if (err) {
+#ifdef CONFIG_RSBAC
+		rsbac_printk(KERN_WARNING
+				"do_move_mount() [sys_mount()]: attach_recursive_mnt() failed -> calling rsbac_mount() for old Device %02u:%02u\n",
+				MAJOR(old_path->mnt->mnt_sb->s_dev),MINOR(old_path->mnt->mnt_sb->s_dev));
+		rsbac_mount(old_path->mnt, mnt_has_parent(old) ? &old->mnt_parent->mnt : NULL);
+#endif
 		goto out;
+        }
+
+#ifdef CONFIG_RSBAC
+	rsbac_mount(old_path->mnt, mnt_has_parent(old) ? &old->mnt_parent->mnt : NULL);
+#endif
 
 	/* if the mount is moved, it should no longer be expire
 	 * automatically */
@@ -2886,6 +3136,11 @@ static int do_add_mount(struct mount *newmnt, struct mountpoint *mp,
 {
 	struct mount *parent = real_mount(path->mnt);
 
+#ifdef CONFIG_RSBAC
+	union rsbac_target_id_t rsbac_target_id;
+	union rsbac_attribute_value_t rsbac_attribute_value;
+#endif
+
 	mnt_flags &= ~MNT_INTERNAL_FLAGS;
 
 	if (unlikely(!check_mnt(parent))) {
@@ -2904,6 +3159,37 @@ static int do_add_mount(struct mount *newmnt, struct mountpoint *mp,
 
 	if (d_is_symlink(newmnt->mnt.mnt_root))
 		return -EINVAL;
+
+#ifdef CONFIG_RSBAC
+	rsbac_pr_debug(aef, "[do_add_mount() [sys_mount()]]: calling ADF for DIR\n");
+	rsbac_target_id.dir.device = path->dentry->d_sb->s_dev;
+	rsbac_target_id.dir.inode  = path->dentry->d_inode->i_ino;
+	rsbac_target_id.dir.dentry_p = path->dentry;
+	rsbac_attribute_value.dummy = 0;
+	if (!rsbac_adf_request(R_MOUNT,
+				task_pid(current),
+				T_DIR,
+				rsbac_target_id,
+				A_none,
+				rsbac_attribute_value)) {
+		err = -EPERM;
+		goto unlock;
+	}
+	rsbac_pr_debug(aef, "[do_mount() [sys_mount()]]: calling ADF for DEV\n");
+	rsbac_target_id.dev.type = D_block;
+	rsbac_target_id.dev.major = RSBAC_MAJOR(newmnt->mnt.mnt_sb->s_dev);
+	rsbac_target_id.dev.minor = RSBAC_MINOR(newmnt->mnt.mnt_sb->s_dev);
+	rsbac_attribute_value.mode = mnt_flags;
+	if (!rsbac_adf_request(R_MOUNT,
+				task_pid(current),
+				T_DEV,
+				rsbac_target_id,
+				A_mode,
+				rsbac_attribute_value)) {
+		err = -EPERM;
+		goto unlock;
+	}
+#endif
 
 	newmnt->mnt.mnt_flags = mnt_flags;
 	return graft_tree(newmnt, parent, mp);
@@ -3824,6 +4110,11 @@ SYSCALL_DEFINE2(pivot_root, const char __user *, new_root,
 	struct mountpoint *old_mp, *root_mp;
 	int error;
 
+#ifdef CONFIG_RSBAC
+	union rsbac_target_id_t rsbac_target_id;
+	union rsbac_attribute_value_t rsbac_attribute_value;
+#endif
+
 	if (!may_mount())
 		return -EPERM;
 
@@ -3846,6 +4137,39 @@ SYSCALL_DEFINE2(pivot_root, const char __user *, new_root,
 	error = PTR_ERR(old_mp);
 	if (IS_ERR(old_mp))
 		goto out3;
+
+#ifdef CONFIG_RSBAC
+	rsbac_pr_debug(aef, "calling ADF for MOUNT on put_old\n");
+	rsbac_target_id.dir.device = old.dentry->d_sb->s_dev;
+	rsbac_target_id.dir.inode  = old.dentry->d_inode->i_ino;
+	rsbac_target_id.dir.dentry_p = old.dentry;
+	rsbac_attribute_value.dummy = 0;
+	if (!rsbac_adf_request(R_MOUNT,
+				task_pid(current),
+				T_DIR,
+				rsbac_target_id,
+				A_none,
+				rsbac_attribute_value))
+	{
+		error = -EPERM;
+		goto out4;
+	}
+	rsbac_pr_debug(aef, "calling ADF for MOUNT on root DIR\n");
+	rsbac_target_id.dir.device = current->fs->root.mnt->mnt_sb->s_dev;
+	rsbac_target_id.dir.inode  = current->fs->root.dentry->d_inode->i_ino;
+	rsbac_target_id.dir.dentry_p = current->fs->root.dentry;
+	rsbac_attribute_value.dummy = 0;
+	if (!rsbac_adf_request(R_MOUNT,
+				task_pid(current),
+				T_DIR,
+				rsbac_target_id,
+				A_none,
+				rsbac_attribute_value))
+	{
+		error = -EPERM;
+		goto out4;
+	}
+#endif
 
 	error = -EINVAL;
 	new_mnt = real_mount(new.mnt);
