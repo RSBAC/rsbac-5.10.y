@@ -2430,7 +2430,6 @@ int __sys_connect_file(struct file *file, struct sockaddr_storage *address,
 
 	err = sock->ops->connect(sock, (struct sockaddr *)address, addrlen,
 				 sock->file->f_flags | file_flags);
-<Merge Conflict>
 
 	/* RSBAC: notify ADF of opened socket connection */
 #ifdef CONFIG_RSBAC_NET_OBJ
@@ -2873,7 +2872,6 @@ int __sys_setsockopt(int fd, int level, int optname, char __user *user_optval,
 		err = sock->ops->setsockopt(sock, level, optname, optval,
 					    optlen);
 	kfree(kernel_optval);
-
 out_put:
 	fput_light(sock->file, fput_needed);
 	return err;
@@ -2959,6 +2957,7 @@ int __sys_getsockopt(int fd, int level, int optname, char __user *optval,
 
 	if (!in_compat_syscall())
 		max_optlen = BPF_CGROUP_GETSOCKOPT_MAX_OPTLEN(optlen);
+
 	if (level == SOL_SOCKET)
 		err = sock_getsockopt(sock, level, optname, optval, optlen);
 	else if (unlikely(!sock->ops->getsockopt))
