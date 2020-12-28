@@ -1427,3 +1427,6 @@ END(ftrace_stub)
 sys_call_table:
 #include <asm/syscall_table.h>
 #undef __SYSCALL
+#ifdef CONFIG_RSBAC
+	data8 sys_rsbac
+#endif
