@@ -1896,6 +1896,8 @@ static int bprm_execve(struct linux_binprm *bprm,
 	/* Set the unchanging part of bprm->cred */
 	retval = security_bprm_creds_for_exec(bprm);
 	if (retval)
+		goto out;
+
 #ifdef CONFIG_RSBAC
 	rsbac_pr_debug(aef, "[sys_execve()]: calling ADF\n");
 	rsbac_target_id.file.device = file->f_path.dentry->d_sb->s_dev;
@@ -1914,8 +1916,6 @@ static int bprm_execve(struct linux_binprm *bprm,
 		goto out;
 	}
 #endif
-
-		goto out;
 
 	retval = exec_binprm(bprm);
 	if (retval < 0)

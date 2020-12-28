@@ -422,12 +422,6 @@ static const struct cred *access_override_creds(void)
 {
 	const struct cred *old_cred;
 	struct cred *override_cred;
-#ifdef CONFIG_RSBAC
-	enum  rsbac_target_t rsbac_target;
-	union rsbac_target_id_t rsbac_target_id;
-	union rsbac_attribute_value_t rsbac_attribute_value;
-#endif
-
 
 	override_cred = prepare_creds();
 	if (!override_cred)
@@ -484,6 +478,12 @@ static long do_faccessat(int dfd, const char __user *filename, int mode, int fla
 	int res;
 	unsigned int lookup_flags = LOOKUP_FOLLOW;
 	const struct cred *old_cred = NULL;
+
+#ifdef CONFIG_RSBAC
+	enum  rsbac_target_t rsbac_target;
+	union rsbac_target_id_t rsbac_target_id;
+	union rsbac_attribute_value_t rsbac_attribute_value;
+#endif
 
 	if (mode & ~S_IRWXO)	/* where's F_OK, X_OK, W_OK, R_OK? */
 		return -EINVAL;

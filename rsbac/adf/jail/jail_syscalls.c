@@ -4,9 +4,9 @@
 /* Facility (ADF) - JAIL module                      */
 /* File: rsbac/adf/jail/syscalls.c                   */
 /*                                                   */
-/* Author and (c) 1999-2018: Amon Ott <ao@rsbac.org> */
+/* Author and (c) 1999-2020: Amon Ott <ao@rsbac.org> */
 /*                                                   */
-/* Last modified: 29/Oct/2018                        */
+/* Last modified: 29/Dec/2020                        */
 /*************************************************** */
 
 #include <linux/string.h>
@@ -16,6 +16,8 @@
 #include <linux/syscalls.h>
 #include <linux/file.h>
 #include <linux/fdtable.h>
+#include <linux/namei.h>
+#include <linux/fs_struct.h>
 #include <rsbac/types.h>
 #include <rsbac/aci.h>
 #include <rsbac/error.h>
@@ -152,13 +154,35 @@ int rsbac_jail_sys_jail(rsbac_version_t version,
 	{
 		struct file * file;
 		struct files_struct *files = current->files;
+		struct path kernel_path;
 		struct fdtable *fdt;
+		unsigned int lookup_flags = LOOKUP_FOLLOW | LOOKUP_DIRECTORY;
 		int fd;
 
-		err = ksys_chroot(path);
-		if(err)
+retry:
+		err = user_path_at(AT_FDCWD, path, lookup_flags, &kernel_path);
+		if (err)
 			return err;
-		err = ksys_chdir("/");
+
+		err = inode_permission(kernel_path.dentry->d_inode, MAY_EXEC | MAY_CHDIR);
+		if (err) {
+			goto dput_and_out;
+		}
+		if (!ns_capable(current_user_ns(), CAP_SYS_CHROOT)) {
+			err = -EPERM;
+			goto dput_and_out;
+		}
+		set_fs_pwd(current->fs, &kernel_path);
+		set_fs_root(current->fs, &kernel_path);
+
+dput_and_out:
+		path_put(&kernel_path);
+		if (retry_estale(err, lookup_flags)) {
+			lookup_flags |= LOOKUP_REVAL;
+			goto retry;
+		}
+		if (err)
+			return err;
 
 restart:
 		rcu_read_lock();

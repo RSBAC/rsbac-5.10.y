@@ -6,7 +6,7 @@
 /*                                                   */
 /* Author and (c) 1999-2020: Amon Ott <ao@rsbac.org> */
 /*                                                   */
-/* Last modified: 27/Mar/2020                        */
+/* Last modified: 29/Dec/2020                        */
 /*************************************************** */
 
 #include <linux/types.h>
@@ -410,12 +410,11 @@ static int reg_modules_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, reg_modules_proc_show, NULL);
 }
 
-static const struct file_operations reg_modules_proc_fops = {
-	.owner		= THIS_MODULE,
-	.open		= reg_modules_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
+static const struct proc_ops reg_modules_proc_ops = {
+	.proc_open	= reg_modules_proc_open,
+	.proc_read	= seq_read,
+	.proc_lseek	= seq_lseek,
+	.proc_release	= single_release,
 };
 
 static struct proc_dir_entry *reg_modules;
@@ -458,7 +457,7 @@ void __init rsbac_reg_init(void)
     {
       reg_modules = proc_create(RSBAC_REG_PROC_NAME,
                                       S_IFREG | S_IRUGO,
-                                      proc_rsbac_root_p, &reg_modules_proc_fops);
+                                      proc_rsbac_root_p, &reg_modules_proc_ops);
     }
     #endif
   }

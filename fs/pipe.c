@@ -414,7 +414,7 @@ pipe_read(struct kiocb *iocb, struct iov_iter *to)
 	if (wake_next_reader)
 		wake_up_interruptible_sync_poll(&pipe->rd_wait, EPOLLIN | EPOLLRDNORM);
 	kill_fasync(&pipe->fasync_writers, SIGIO, POLL_OUT);
-	if (ret > 0)
+	if (ret > 0) {
 		file_accessed(filp);
 
 #ifdef CONFIG_RSBAC_RW
