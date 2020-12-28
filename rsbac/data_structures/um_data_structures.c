@@ -3,7 +3,7 @@
 /* Implementation of User Management data structures */
 /* Author and (c) 1999-2020: Amon Ott <ao@rsbac.org> */
 /*                                                   */
-/* Last modified: 30/Mar/2020                        */
+/* Last modified: 29/Dec/2020                        */
 /*************************************************** */
 
 #include <linux/types.h>
@@ -339,12 +339,11 @@ static int stats_um_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, stats_um_proc_show, NULL);
 }
 
-static const struct file_operations stats_um_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = stats_um_proc_open,
-       .read           = seq_read,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops stats_um_proc_ops = {
+       .proc_open	= stats_um_proc_open,
+       .proc_read	= seq_read,
+       .proc_lseek	= seq_lseek,
+       .proc_release	= single_release,
 };
 
 static struct proc_dir_entry *stats_um;
@@ -739,7 +738,7 @@ int __init rsbac_init_um(void)
 
 #if defined(CONFIG_RSBAC_PROC)
 	stats_um = proc_create("stats_um", S_IFREG | S_IRUGO,
-					proc_rsbac_root_p, &stats_um_proc_fops);
+					proc_rsbac_root_p, &stats_um_proc_ops);
 #endif
 
 	rsbac_pr_debug(ds_um, "Ready.\n");

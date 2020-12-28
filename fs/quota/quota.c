@@ -39,6 +39,7 @@ static int check_quotactl_permission(struct super_block *sb, int type, int cmd,
 	case Q_XGETQSTAT:
 	case Q_XGETQSTATV:
 	case Q_XQUOTASYNC:
+
 #ifdef CONFIG_RSBAC
 		rsbac_target_id.scd = ST_quota;
 		rsbac_attribute_value.dummy = 0;
@@ -52,12 +53,14 @@ static int check_quotactl_permission(struct super_block *sb, int type, int cmd,
 			return -EPERM;
 		}
 #endif
+
 		break;
 	/* allow to query information for dquots we "own" */
 	case Q_GETQUOTA:
 	case Q_XGETQUOTA:
 		if ((type == USRQUOTA && uid_eq(current_euid(), make_kuid(current_user_ns(), id))) ||
 		    (type == GRPQUOTA && in_egroup_p(make_kgid(current_user_ns(), id)))) {
+
 #ifdef CONFIG_RSBAC
 			rsbac_target_id.scd = ST_quota;
 			rsbac_attribute_value.dummy = 0;
@@ -71,7 +74,9 @@ static int check_quotactl_permission(struct super_block *sb, int type, int cmd,
 				return -EPERM;
 			}
 #endif
+
 			break;
+		}
 		fallthrough;
 	default:
 		if (!capable(CAP_SYS_ADMIN))
@@ -91,6 +96,7 @@ static int check_quotactl_permission(struct super_block *sb, int type, int cmd,
 			return -EPERM;
 		}
 #endif
+
 	}
 
 	return security_quotactl(cmd, type, id, sb);

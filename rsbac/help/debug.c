@@ -6,7 +6,7 @@
 /*                                           */
 /* Debug and logging functions for all parts */
 /*                                           */
-/* Last modified: 22/Apr/2020                */
+/* Last modified: 28/Dec/2020                */
 /******************************************* */
  
 #include <linux/uaccess.h>
@@ -1441,7 +1441,7 @@ static int rmsg_release(struct inode * inode, struct file * file)
 	return 0;
 }
 
-static ssize_t rmsg_read(struct file * file, char * buf,
+static ssize_t rmsg_read(struct file * file, char __user * buf,
 			 size_t count, loff_t *ppos)
 {
 	return rsbac_log(2,buf,count);
@@ -1455,11 +1455,11 @@ static unsigned int rmsg_poll(struct file *file, poll_table * wait)
 	return 0;
 }
 
-static struct file_operations rmsg_proc_fops = {
-	.read = rmsg_read,
-	.poll = rmsg_poll,	/* rmsg_poll */
-	.open = rmsg_open,
-	.release = rmsg_release
+static struct proc_ops rmsg_proc_ops = {
+	.proc_read = rmsg_read,
+	.proc_poll = rmsg_poll,	/* rmsg_poll */
+	.proc_open = rmsg_open,
+	.proc_release = rmsg_release
 };
 
 static struct proc_dir_entry *rmsg;
@@ -1638,13 +1638,12 @@ static int log_levels_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, log_levels_proc_show, NULL);
 }
 
-static const struct file_operations log_levels_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = log_levels_proc_open,
-       .read           = seq_read,
-       .write          = log_levels_proc_write,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops log_levels_proc_ops = {
+       .proc_open           = log_levels_proc_open,
+       .proc_read           = seq_read,
+       .proc_write          = log_levels_proc_write,
+       .proc_lseek          = seq_lseek,
+       .proc_release        = single_release,
 };
 
 static struct proc_dir_entry *log_levels;
@@ -4175,13 +4174,12 @@ static int debug_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, debug_proc_show, NULL);
 }
 
-static const struct file_operations debug_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = debug_proc_open,
-       .read           = seq_read,
-       .write          = debug_proc_write,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops debug_proc_ops = {
+       .proc_open           = debug_proc_open,
+       .proc_read           = seq_read,
+       .proc_write          = debug_proc_write,
+       .proc_lseek          = seq_lseek,
+       .proc_release        = single_release,
 };
 
 static struct proc_dir_entry *debug;
@@ -4535,12 +4533,12 @@ inline void __init rsbac_init_debug(void)
           }
 
         #if defined(CONFIG_RSBAC_PROC)
-	log_levels = proc_create("log_levels", S_IFREG | S_IRUGO | S_IWUGO, proc_rsbac_root_p, &log_levels_proc_fops);
+	log_levels = proc_create("log_levels", S_IFREG | S_IRUGO | S_IWUGO, proc_rsbac_root_p, &log_levels_proc_ops);
 
-	debug = proc_create("debug", S_IFREG | S_IRUGO | S_IWUGO, proc_rsbac_root_p, &debug_proc_fops);
+	debug = proc_create("debug", S_IFREG | S_IRUGO | S_IWUGO, proc_rsbac_root_p, &debug_proc_ops);
 
         #if defined(CONFIG_RSBAC_RMSG)
-	rmsg = proc_create("rmsg", S_IFREG | S_IRUGO, proc_rsbac_root_p, &rmsg_proc_fops);
+	rmsg = proc_create("rmsg", S_IFREG | S_IRUGO, proc_rsbac_root_p, &rmsg_proc_ops);
         #endif
         #endif
 

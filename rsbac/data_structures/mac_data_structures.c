@@ -3,7 +3,7 @@
 /* Implementation of MAC data structures            */
 /* Author and (c) 1999-2020: Amon Ott <ao@rsbac.org> */
 /*                                                   */
-/* Last modified: 30/Mar/2020                        */
+/* Last modified: 29/Dec/2020                        */
 /*************************************************** */
 
 #include <linux/types.h>
@@ -451,12 +451,11 @@ static int mac_devices_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, mac_devices_proc_show, NULL);
 }
 
-static const struct file_operations mac_devices_proc_fops = {
-	.owner		= THIS_MODULE,
-	.open		= mac_devices_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
+static const struct proc_ops mac_devices_proc_ops = {
+	.proc_open	= mac_devices_proc_open,
+	.proc_read	= seq_read,
+	.proc_lseek	= seq_lseek,
+	.proc_release	= single_release,
 };
 
 static struct proc_dir_entry *mac_devices;
@@ -515,12 +514,11 @@ static int stats_mac_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, stats_mac_proc_show, NULL);
 }
 
-static const struct file_operations stats_mac_proc_fops = {
-	.owner		= THIS_MODULE,
-	.open		= stats_mac_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
+static const struct proc_ops stats_mac_proc_ops = {
+	.proc_open	= stats_mac_proc_open,
+	.proc_read	= seq_read,
+	.proc_lseek	= seq_lseek,
+	.proc_release	= single_release,
 };
 
 static struct proc_dir_entry *stats_mac;
@@ -656,12 +654,11 @@ static int mac_trulist_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, mac_trulist_proc_show, NULL);
 }
 
-static const struct file_operations mac_trulist_proc_fops = {
-	.owner		= THIS_MODULE,
-	.open		= mac_trulist_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
+static const struct proc_ops mac_trulist_proc_ops = {
+	.proc_open	= mac_trulist_proc_open,
+	.proc_read	= seq_read,
+	.proc_lseek	= seq_lseek,
+	.proc_release	= single_release,
 };
 
 static struct proc_dir_entry *mac_trulist;
@@ -766,13 +763,13 @@ int __init rsbac_init_mac(void)
 #if defined(CONFIG_RSBAC_PROC) && defined(CONFIG_PROC_FS)
 	mac_devices = proc_create("mac_devices",
 			S_IFREG | S_IRUGO | S_IWUGO,
-			proc_rsbac_root_p, &mac_devices_proc_fops);
+			proc_rsbac_root_p, &mac_devices_proc_ops);
 	stats_mac = proc_create("stats_mac",
 			S_IFREG | S_IRUGO,
-			proc_rsbac_root_p, &stats_mac_proc_fops);
+			proc_rsbac_root_p, &stats_mac_proc_ops);
 	mac_trulist = proc_create("mac_trusted",
 			S_IFREG | S_IRUGO,
-			proc_rsbac_root_p, &mac_trulist_proc_fops);
+			proc_rsbac_root_p, &mac_trulist_proc_ops);
 #endif
 
 	rsbac_pr_debug(aef_mac, "Ready.\n");
