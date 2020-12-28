@@ -687,6 +687,7 @@ static __must_check int do_mlock(unsigned long start, size_t len, vm_flags_t fla
 #endif
 
 	start = untagged_addr(start);
+
 	if (!can_do_mlock())
 		return -EPERM;
 

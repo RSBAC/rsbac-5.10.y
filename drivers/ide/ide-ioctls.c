@@ -248,9 +248,6 @@ int generic_ide_ioctl(ide_drive_t *drive, struct block_device *bdev,
 	int err;
 	void __user *argp = (void __user *)arg;
 
-	if (in_compat_syscall())
-		argp = compat_ptr(arg);
-
 #ifdef CONFIG_RSBAC
 	enum  rsbac_adf_request_t rsbac_request;
 	union rsbac_target_id_t rsbac_target_id;
@@ -302,6 +299,9 @@ int generic_ide_ioctl(ide_drive_t *drive, struct block_device *bdev,
 		return -EPERM;
 	}
 #endif
+
+	if (in_compat_syscall())
+		argp = compat_ptr(arg);
 
 	err = ide_setting_ioctl(drive, bdev, cmd, arg, ide_ioctl_settings);
 	if (err != -EOPNOTSUPP)
