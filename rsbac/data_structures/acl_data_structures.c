@@ -3,7 +3,7 @@
 /* Implementation of ACL data structures             */
 /* Author and (c) 1999-2020: Amon Ott <ao@rsbac.org> */
 /*                                                   */
-/* Last modified: 30/Mar/2020                        */
+/* Last modified: 29/Dec/2020                        */
 /*************************************************** */
 
 #include <linux/types.h>
@@ -1048,12 +1048,11 @@ static int acl_devices_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, acl_devices_proc_show, NULL);
 }
 
-static const struct file_operations acl_devices_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = acl_devices_proc_open,
-       .read           = seq_read,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops acl_devices_proc_ops = {
+       .proc_open	= acl_devices_proc_open,
+       .proc_read	= seq_read,
+       .proc_lseek	= seq_lseek,
+       .proc_release	= single_release,
 };
 
 static struct proc_dir_entry *acl_devices;
@@ -1173,12 +1172,11 @@ static int stats_acl_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, stats_acl_proc_show, NULL);
 }
 
-static const struct file_operations stats_acl_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = stats_acl_proc_open,
-       .read           = seq_read,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops stats_acl_proc_ops = {
+       .proc_open	= stats_acl_proc_open,
+       .proc_read	= seq_read,
+       .proc_lseek	= seq_lseek,
+       .proc_release	= single_release,
 };
 
 static struct proc_dir_entry *stats_acl;
@@ -2105,12 +2103,11 @@ static int acl_acllist_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, acl_acllist_proc_show, NULL);
 }
 
-static const struct file_operations acl_acllist_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = acl_acllist_proc_open,
-       .read           = seq_read,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops acl_acllist_proc_ops = {
+       .proc_open	= acl_acllist_proc_open,
+       .proc_read	= seq_read,
+       .proc_lseek	= seq_lseek,
+       .proc_release	= single_release,
 };
 
 static struct proc_dir_entry *acl_acllist;
@@ -2225,12 +2222,11 @@ static int acl_grouplist_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, acl_grouplist_proc_show, NULL);
 }
 
-static const struct file_operations acl_grouplist_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = acl_grouplist_proc_open,
-       .read           = seq_read,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops acl_grouplist_proc_ops = {
+       .proc_open	= acl_grouplist_proc_open,
+       .proc_read	= seq_read,
+       .proc_lseek	= seq_lseek,
+       .proc_release	= single_release,
 };
 
 static struct proc_dir_entry *acl_grouplist;
@@ -3220,16 +3216,16 @@ int __init rsbac_init_acl(void)
 #if defined(CONFIG_RSBAC_PROC)
 	acl_devices = proc_create("acl_devices",
 					S_IFREG | S_IRUGO,
-					proc_rsbac_root_p, &acl_devices_proc_fops);
+					proc_rsbac_root_p, &acl_devices_proc_ops);
 	stats_acl = proc_create("stats_acl",
 					S_IFREG | S_IRUGO,
-					proc_rsbac_root_p, &stats_acl_proc_fops);
+					proc_rsbac_root_p, &stats_acl_proc_ops);
 	acl_acllist = proc_create("acl_acllist",
 					S_IFREG | S_IRUGO,
-					proc_rsbac_root_p, &acl_acllist_proc_fops);
+					proc_rsbac_root_p, &acl_acllist_proc_ops);
 	acl_grouplist = proc_create("acl_grouplist",
 					S_IFREG | S_IRUGO,
-					proc_rsbac_root_p, &acl_grouplist_proc_fops);
+					proc_rsbac_root_p, &acl_grouplist_proc_ops);
 #endif
 
 	rsbac_pr_debug(ds_acl, "Ready.\n");
