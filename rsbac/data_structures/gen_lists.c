@@ -3,7 +3,7 @@
 /* Author and (c) 1999-2020:           */
 /*   Amon Ott <ao@rsbac.org>           */
 /* Generic lists for all parts         */
-/* Last modified: 22/Jul/2020          */
+/* Last modified: 29/Dec/2020          */
 /************************************* */
 
 #include <linux/sched.h>
@@ -5350,7 +5350,6 @@ static int fill_buffer(struct rsbac_list_reg_item_t *list,
 static int rsbac_list_write_buffers(struct rsbac_list_write_head_t write_head)
 {
 	long file_fd;
-	mm_segment_t oldfs;
 	int count = 0;
 	u_int written;
 	u_long all_written;
@@ -5361,7 +5360,6 @@ static int rsbac_list_write_buffers(struct rsbac_list_write_head_t write_head)
 	struct rsbac_list_write_item_t *write_item_p;
 	struct rsbac_list_write_item_t *next_item_p;
 
-	oldfs = get_fs();
 	write_item_p = write_head.head;
 	while (write_item_p) {
 		rsbac_pr_debug(write, "write list %s on device %02u:%02u.\n",
@@ -5567,7 +5565,6 @@ static int rsbac_list_write_lol_buffers(struct rsbac_list_lol_write_head_t
 					write_head)
 {
 	long file_fd;
-	mm_segment_t oldfs;
 	int count = 0;
 	u_long written;
         u_long all_written;
@@ -5578,7 +5575,6 @@ static int rsbac_list_write_lol_buffers(struct rsbac_list_lol_write_head_t
 	struct rsbac_list_lol_write_item_t *write_item_p;
 	struct rsbac_list_lol_write_item_t *next_item_p;
 
-	oldfs = get_fs();
 	write_item_p = write_head.head;
 	while (write_item_p) {
 		rsbac_pr_debug(write, "write list of lists %s on device %02u:%02u.\n",
@@ -5871,12 +5867,11 @@ static int lists_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, lists_proc_show, NULL);
 }
 
-static const struct file_operations lists_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = lists_proc_open,
-       .read           = seq_read,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops lists_proc_ops = {
+       .proc_open           = lists_proc_open,
+       .proc_read           = seq_read,
+       .proc_lseek          = seq_lseek,
+       .proc_release        = single_release,
 };
 
 static struct proc_dir_entry *lists_proc;
@@ -6062,12 +6057,11 @@ static int lists_counts_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, lists_counts_proc_show, NULL);
 }
 
-static const struct file_operations lists_counts_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = lists_counts_proc_open,
-       .read           = seq_read,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops lists_counts_proc_ops = {
+       .proc_open           = lists_counts_proc_open,
+       .proc_read           = seq_read,
+       .proc_lseek          = seq_lseek,
+       .proc_release        = single_release,
 };
 
 static struct proc_dir_entry *lists_counts_proc;
@@ -6288,11 +6282,11 @@ int __init rsbac_list_init(void)
 #if defined(CONFIG_RSBAC_PROC)
 	{
 		lists_proc = proc_create(RSBAC_LIST_PROC_NAME, S_IFREG | S_IRUGO,
-				proc_rsbac_root_p, &lists_proc_fops);
+				proc_rsbac_root_p, &lists_proc_ops);
 		lists_counts_proc = proc_create(RSBAC_LIST_COUNTS_PROC_NAME,
 						S_IFREG | S_IRUGO,
 						proc_rsbac_root_p,
-						&lists_counts_proc_fops);
+						&lists_counts_proc_ops);
 	}
 #endif
 
@@ -7073,12 +7067,11 @@ static int backup_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, backup_proc_show, NULL);
 }
 
-static const struct file_operations backup_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = backup_proc_open,
-       .read           = seq_read,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops backup_proc_ops = {
+       .proc_open           = backup_proc_open,
+       .proc_read           = seq_read,
+       .proc_lseek          = seq_lseek,
+       .proc_release        = single_release,
 };
 
 static int lol_backup_proc_open(struct inode *inode, struct file *file)
@@ -7086,12 +7079,11 @@ static int lol_backup_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, lol_backup_proc_show, NULL);
 }
 
-static const struct file_operations lol_backup_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = lol_backup_proc_open,
-       .read           = seq_read,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops lol_backup_proc_ops = {
+       .proc_open           = lol_backup_proc_open,
+       .proc_read           = seq_read,
+       .proc_lseek          = seq_lseek,
+       .proc_release        = single_release,
 };
 #endif
 
@@ -7265,7 +7257,7 @@ int rsbac_list_register_hashed(rsbac_version_t ds_version,
 	if (flags & RSBAC_LIST_BACKUP) {
 		reg_item_p->proc_entry_p =
 		proc_create_data(reg_item_p->name, S_IFREG | S_IRUGO,
-				      proc_rsbac_backup_p, &backup_proc_fops,
+				      proc_rsbac_backup_p, &backup_proc_ops,
 				      (void *) reg_item_p);
 	} else {
 		reg_item_p->proc_entry_p = NULL;
@@ -7466,7 +7458,7 @@ int rsbac_list_lol_register_hashed(rsbac_version_t ds_version,
 	if (flags & RSBAC_LIST_BACKUP) {
 		reg_item_p->proc_entry_p =
 		    proc_create_data(reg_item_p->name, S_IFREG | S_IRUGO,
-				      proc_rsbac_backup_p, &lol_backup_proc_fops,
+				      proc_rsbac_backup_p, &lol_backup_proc_ops,
 				      (void *) reg_item_p);
 	} else {
 		reg_item_p->proc_entry_p = NULL;

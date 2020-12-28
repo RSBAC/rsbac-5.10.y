@@ -5,7 +5,7 @@
 /*                                                   */
 /* Author and (c) 1999-2020: Amon Ott <ao@rsbac.org> */
 /*                                                   */
-/* Last modified: 22/Apr/2020                        */
+/* Last modified: 29/Dec/2020                        */
 /*************************************************** */
 
 #include <linux/string.h>
@@ -2642,7 +2642,6 @@ static int do_rsbac_sec_trunc(struct dentry * dentry_p,
         char            * buffer;
         struct file       file;
         int               tmperr = 0;
-        mm_segment_t      oldfs;
 
         buffer = rsbac_kmalloc(RSBAC_SEC_DEL_CHUNK_SIZE);
         if(!buffer)
@@ -2682,16 +2681,10 @@ static int do_rsbac_sec_trunc(struct dentry * dentry_p,
 
         /* OK, now we can start writing */
 
-        /* Set current user space to kernel space, because write() reads
-         * from user space
-         */
-        oldfs = get_fs();
-        set_fs(KERNEL_DS);
-
-          { /* taken from fs/read_write.c */
-            file.f_pos = new_len;
-            file.f_version = 0;
-          }
+        { /* taken from fs/read_write.c */
+          file.f_pos = new_len;
+          file.f_version = 0;
+        }
         memset(buffer,0,RSBAC_SEC_DEL_CHUNK_SIZE);
 
 #ifdef CONFIG_RSBAC_DEBUG
@@ -2706,26 +2699,13 @@ static int do_rsbac_sec_trunc(struct dentry * dentry_p,
 #endif
 	while (new_len < old_len)
 	{
-		struct iovec iov = { .iov_base = buffer,
-				.iov_len = rsbac_min(RSBAC_SEC_DEL_CHUNK_SIZE, old_len-new_len) };
-		struct kiocb kiocb;
-		struct iov_iter iter;
-
-		init_sync_kiocb(&kiocb, &file);
-		kiocb.ki_pos = file.f_pos;
-		iov_iter_init(&iter, WRITE, &iov, 1, iov.iov_len);
-
-		tmperr = file.f_op->write_iter(&kiocb, &iter);
-		BUG_ON(tmperr == -EIOCBQUEUED);
-		file.f_pos = kiocb.ki_pos;
-
+	        tmperr = kernel_write(&file, buffer, rsbac_min(RSBAC_SEC_DEL_CHUNK_SIZE, old_len-new_len), &file.f_pos);
 		if (tmperr < 0) {
 			err = tmperr;
 			break;
 		}
 		new_len += tmperr;
 	}
-        set_fs(oldfs);
 
 #ifdef CONFIG_RSBAC_DEBUG
         if(rsbac_debug_write)

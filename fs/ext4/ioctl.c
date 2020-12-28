@@ -840,13 +840,13 @@ static long __ext4_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 	rsbac_pr_debug(aef, "calling ADF\n");
 	switch (cmd) {
-		case EXT4_IOC_GETFLAGS:
+		case FS_IOC_GETFLAGS:
 		case EXT4_IOC_GETVERSION:
 		case EXT4_IOC_GETVERSION_OLD:
 		case EXT4_IOC_GETRSVSZ:
 			rsbac_request = R_GET_PERMISSIONS_DATA;
 			break;
-		case EXT4_IOC_SETFLAGS:
+		case FS_IOC_SETFLAGS:
 		case EXT4_IOC_SETVERSION:
 		case EXT4_IOC_SETVERSION_OLD:
 		case EXT4_IOC_SETRSVSZ:

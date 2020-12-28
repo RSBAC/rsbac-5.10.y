@@ -699,6 +699,7 @@ int tty_mode_ioctl(struct tty_struct *tty, struct file *file,
 #endif
 
 	BUG_ON(file == NULL);
+
 	if (tty->driver->type == TTY_DRIVER_TYPE_PTY &&
 	    tty->driver->subtype == PTY_TYPE_MASTER)
 		real_tty = tty->link;

@@ -1540,7 +1540,6 @@ static struct dentry *lookup_fast(struct nameidata *nd,
 		dput(dentry);
 		return ERR_PTR(status);
 	}
-	return dentry;
 
 #ifdef CONFIG_RSBAC
 	if (   dentry
@@ -1559,14 +1558,15 @@ static struct dentry *lookup_fast(struct nameidata *nd,
 					rsbac_attribute_value)) {
 			dput(dentry);
 #ifdef CONFIG_RSBAC_FSOBJ_HIDE
-			return -ENOENT;
+			return ERR_PTR(-ENOENT);
 #else
-			return -EPERM;
+			return ERR_PTR(-EPERM);
 #endif
 		}
 	}
 #endif
 
+	return dentry;
 }
 
 /* Fast lookup failed, do it the slow way */
@@ -1664,6 +1664,14 @@ static const char *pick_link(struct nameidata *nd, struct path *link,
 	const char *res;
 	int error = reserve_stack(nd, link, seq);
 
+#ifdef CONFIG_RSBAC
+	union rsbac_target_id_t rsbac_target_id;
+	union rsbac_attribute_value_t rsbac_attribute_value;
+#ifdef CONFIG_RSBAC_SYM_REDIR
+	char * rsbac_name = NULL;
+#endif
+#endif
+
 	if (unlikely(error)) {
 		if (!(nd->flags & LOOKUP_RCU))
 			path_put(link);
@@ -1698,6 +1706,28 @@ static const char *pick_link(struct nameidata *nd, struct path *link,
 	if (unlikely(error))
 		return ERR_PTR(error);
 
+#ifdef CONFIG_RSBAC
+	if (link->dentry->d_sb && link->dentry->d_inode) {
+		rsbac_target_id.symlink.device = link->dentry->d_sb->s_dev;
+		rsbac_target_id.symlink.inode  = link->dentry->d_inode->i_ino;
+		rsbac_target_id.symlink.dentry_p = link->dentry;
+		rsbac_attribute_value.dummy = 0;
+		if (!rsbac_adf_request(R_SEARCH,
+					task_pid(current),
+					T_SYMLINK,
+					rsbac_target_id,
+					A_none,
+					rsbac_attribute_value)) {
+#ifdef CONFIG_RSBAC_FSOBJ_HIDE
+			error = -ENOENT;
+#else
+			error = -EPERM;
+#endif
+			return ERR_PTR(error);
+		}
+	}
+#endif
+
 	res = READ_ONCE(inode->i_link);
 	if (!res) {
 		const char * (*get)(struct dentry *, struct inode *,
@@ -1715,16 +1745,45 @@ static const char *pick_link(struct nameidata *nd, struct path *link,
 		if (IS_ERR(res))
 			return res;
 	}
+
+#ifdef CONFIG_RSBAC_SYM_REDIR
+	if (link->dentry->d_inode && S_ISLNK(link->dentry->d_inode->i_mode)) {
+		rsbac_name = rsbac_symlink_redirect(link->dentry->d_inode, res, PATH_MAX, FALSE);
+		if (rsbac_name)
+			res = rsbac_name;
+	}
+#endif
+
 	if (*res == '/') {
 		error = nd_jump_root(nd);
-		if (unlikely(error))
+		if (unlikely(error)) {
+
+#ifdef CONFIG_RSBAC_SYM_REDIR
+			if (rsbac_name)
+				kfree(rsbac_name);
+#endif
+
 			return ERR_PTR(error);
+		}
 		while (unlikely(*++res == '/'))
 			;
 	}
-	if (*res)
+	if (*res) {
+
+#ifdef CONFIG_RSBAC_SYM_REDIR
+		if (rsbac_name)
+			rsbac_delayed_kfree(rsbac_name, 120);
+#endif
+
 		return res;
+	}
 all_done: // pure jump
+
+#ifdef CONFIG_RSBAC_SYM_REDIR
+	if (rsbac_name)
+		kfree(rsbac_name);
+#endif
+
 	put_link(nd);
 	return NULL;
 }
@@ -3213,7 +3272,7 @@ static struct dentry *atomic_open(struct nameidata *nd, struct dentry *dentry,
 					rsbac_attribute_value)) {
 			d_lookup_done(dentry);
 			dput(dentry);
-			return -EPERM;
+			return ERR_PTR(-EPERM);
 		}
 	}
 #endif
@@ -3471,14 +3530,6 @@ static const char *open_last_lookups(struct nameidata *nd,
 	struct dentry *dentry;
 	const char *res;
 
-#ifdef CONFIG_RSBAC
-	enum  rsbac_adf_request_t rsbac_adf_req = R_NONE;
-	enum  rsbac_target_t rsbac_target = T_NONE;
-	union rsbac_target_id_t rsbac_target_id;
-	union rsbac_target_id_t rsbac_new_target_id;
-	union rsbac_attribute_value_t rsbac_attribute_value;
-#endif
-
 	nd->flags |= op->intent;
 
 	if (nd->last_type != LAST_NORM) {
@@ -3562,6 +3613,14 @@ static int do_open(struct nameidata *nd,
 	int acc_mode;
 	int error;
 
+#ifdef CONFIG_RSBAC
+	enum  rsbac_adf_request_t rsbac_adf_req = R_NONE;
+	enum  rsbac_target_t rsbac_target = T_NONE;
+	union rsbac_target_id_t rsbac_target_id;
+	union rsbac_target_id_t rsbac_new_target_id;
+	union rsbac_attribute_value_t rsbac_attribute_value;
+#endif
+
 	if (!(file->f_mode & (FMODE_OPENED | FMODE_CREATED))) {
 		error = complete_walk(nd);
 		if (error)
@@ -3595,70 +3654,71 @@ static int do_open(struct nameidata *nd,
 		do_truncate = true;
 	}
 	error = may_open(&nd->path, acc_mode, open_flag);
-	if (!error && !(file->f_mode & FMODE_OPENED))
+	if (!error && !(file->f_mode & FMODE_OPENED)) {
 
 #ifdef CONFIG_RSBAC
-	rsbac_pr_debug(aef, "do_last() [sys_open()]: calling ADF\n");
-	/* get target type and id clear */
-	if (S_ISBLK(nd->path.dentry->d_inode->i_mode) || S_ISCHR(nd->path.dentry->d_inode->i_mode)){
-		rsbac_target = T_DEV;
-		if (S_ISBLK(nd->path.dentry->d_inode->i_mode)) {
-			rsbac_target_id.dev.type = D_block;
+		rsbac_pr_debug(aef, "do_last() [sys_open()]: calling ADF\n");
+		/* get target type and id clear */
+		if (S_ISBLK(nd->path.dentry->d_inode->i_mode) || S_ISCHR(nd->path.dentry->d_inode->i_mode)){
+			rsbac_target = T_DEV;
+			if (S_ISBLK(nd->path.dentry->d_inode->i_mode)) {
+				rsbac_target_id.dev.type = D_block;
+			}
+			else {
+				rsbac_target_id.dev.type = D_char;
+			}
+			rsbac_target_id.dev.major = RSBAC_MAJOR(nd->path.dentry->d_inode->i_rdev);
+			rsbac_target_id.dev.minor = RSBAC_MINOR(nd->path.dentry->d_inode->i_rdev);
 		}
-		else {
-			rsbac_target_id.dev.type = D_char;
-		}
-		rsbac_target_id.dev.major = RSBAC_MAJOR(nd->path.dentry->d_inode->i_rdev);
-		rsbac_target_id.dev.minor = RSBAC_MINOR(nd->path.dentry->d_inode->i_rdev);
-	}
-	else { /* must be file, dir or fifo */
-		if (S_ISDIR(nd->path.dentry->d_inode->i_mode))
-			rsbac_target = T_DIR;
-		else if (S_ISSOCK(nd->path.dentry->d_inode->i_mode))
-			rsbac_target = T_UNIXSOCK;
-		else if (S_ISFIFO(nd->path.dentry->d_inode->i_mode)) {
-			if (nd->path.dentry->d_inode->i_sb->s_magic != PIPEFS_MAGIC)
-				rsbac_target = T_FIFO;
-			else
-				rsbac_target = T_NONE;
-		}
-		else if (S_ISREG(nd->path.dentry->d_inode->i_mode))
-			rsbac_target = T_FILE;
-
-		rsbac_target_id.file.device = nd->path.dentry->d_inode->i_sb->s_dev;
-		rsbac_target_id.file.inode  = nd->path.dentry->d_inode->i_ino;
-		rsbac_target_id.file.dentry_p = nd->path.dentry;
-	}
-	/* determine request type */
-	rsbac_adf_req = R_NONE;
-	if (open_flag & O_APPEND)
-		rsbac_adf_req = R_APPEND_OPEN;
-	else
-		if ((open_flag & O_RDWR) || ((open_flag & O_WRONLY) && (open_flag & O_RDONLY)))
-			rsbac_adf_req = R_READ_WRITE_OPEN;
-		else
-			if (open_flag & O_WRONLY)
-				rsbac_adf_req = R_WRITE_OPEN;
-			else
-				if (rsbac_target == T_DIR)
-					rsbac_adf_req = R_READ;
+		else { /* must be file, dir or fifo */
+			if (S_ISDIR(nd->path.dentry->d_inode->i_mode))
+				rsbac_target = T_DIR;
+			else if (S_ISSOCK(nd->path.dentry->d_inode->i_mode))
+				rsbac_target = T_UNIXSOCK;
+			else if (S_ISFIFO(nd->path.dentry->d_inode->i_mode)) {
+				if (nd->path.dentry->d_inode->i_sb->s_magic != PIPEFS_MAGIC)
+					rsbac_target = T_FIFO;
 				else
-					rsbac_adf_req = R_READ_OPEN;
-	if ((rsbac_adf_req != R_NONE) && (rsbac_target != T_NONE)) {
-		rsbac_attribute_value.open_flag = open_flag;
-		if (!rsbac_adf_request(rsbac_adf_req,
-					task_pid(current),
-					rsbac_target,
-					rsbac_target_id,
-					A_open_flag,
-					rsbac_attribute_value)) {
-			error = -EPERM;
-			goto out;
+					rsbac_target = T_NONE;
+			}
+			else if (S_ISREG(nd->path.dentry->d_inode->i_mode))
+				rsbac_target = T_FILE;
+
+			rsbac_target_id.file.device = nd->path.dentry->d_inode->i_sb->s_dev;
+			rsbac_target_id.file.inode  = nd->path.dentry->d_inode->i_ino;
+			rsbac_target_id.file.dentry_p = nd->path.dentry;
 		}
-	}
+		/* determine request type */
+		rsbac_adf_req = R_NONE;
+		if (open_flag & O_APPEND)
+			rsbac_adf_req = R_APPEND_OPEN;
+		else
+			if ((open_flag & O_RDWR) || ((open_flag & O_WRONLY) && (open_flag & O_RDONLY)))
+				rsbac_adf_req = R_READ_WRITE_OPEN;
+			else
+				if (open_flag & O_WRONLY)
+					rsbac_adf_req = R_WRITE_OPEN;
+				else
+					if (rsbac_target == T_DIR)
+						rsbac_adf_req = R_READ;
+					else
+						rsbac_adf_req = R_READ_OPEN;
+		if ((rsbac_adf_req != R_NONE) && (rsbac_target != T_NONE)) {
+			rsbac_attribute_value.open_flag = open_flag;
+			if (!rsbac_adf_request(rsbac_adf_req,
+						task_pid(current),
+						rsbac_target,
+						rsbac_target_id,
+						A_open_flag,
+						rsbac_attribute_value)) {
+				error = -EPERM;
+			}
+		}
+		if (!error)
 #endif
 
 		error = vfs_open(&nd->path, file);
+	}
 	if (!error)
 		error = ima_file_check(file, op->acc_mode);
 	if (!error && do_truncate)
@@ -3796,10 +3856,7 @@ static struct file *path_openat(struct nameidata *nd,
 	} else {
 		const char *s = path_init(nd, flags);
 		while (!(error = link_path_walk(s, nd)) &&
-		       (s = open_last_lookups(nd, file, op)) != NULL)
-			;
-		if (!error)
-			error = do_open(nd, file, op);
+		       (s = open_last_lookups(nd, file, op)) != NULL) {
 
 #ifdef CONFIG_RSBAC
 			if (nd->path.dentry->d_sb) {
@@ -3819,6 +3876,9 @@ static struct file *path_openat(struct nameidata *nd,
 			}
 #endif
 
+		}
+		if (!error)
+			error = do_open(nd, file, op);
 		terminate_walk(nd);
 	}
 	if (likely(!error)) {

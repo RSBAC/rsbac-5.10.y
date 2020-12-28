@@ -169,6 +169,7 @@ static ssize_t read_mem(struct file *file, char __user *buf,
 			/* Show zeros for restricted memory. */
 			remaining = clear_user(buf, sz);
 		} else {
+
 #ifdef CONFIG_RSBAC
 			rsbac_attribute_value.pagenr = p >> PAGE_SHIFT;
 			if (rsbac_is_videomem(rsbac_attribute_value.pagenr, count))
@@ -269,6 +270,7 @@ static ssize_t write_mem(struct file *file, const char __user *buf,
 
 		/* Skip actual writing when a page is marked as restricted. */
 		if (allowed == 1) {
+
 #ifdef CONFIG_RSBAC
 			rsbac_attribute_value.pagenr = p >> PAGE_SHIFT;
 			if (rsbac_is_videomem(rsbac_attribute_value.pagenr, sz))

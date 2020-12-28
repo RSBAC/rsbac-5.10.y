@@ -346,7 +346,6 @@ static ssize_t get_mm_cmdline(struct mm_struct *mm, char __user *buf,
 	unsigned long pos, len;
 	char *page, c;
 
-
 	/* Check if process spawned far enough to have cmdline. */
 	if (!mm->env_end)
 		return 0;
@@ -760,15 +759,6 @@ static int proc_oom_score(struct seq_file *m, struct pid_namespace *ns,
 	unsigned long points = 0;
 	long badness;
 
-	badness = oom_badness(task, totalpages);
-	/*
-	 * Special case OOM_SCORE_ADJ_MIN for all others scale the
-	 * badness value into [0, 2000] range which we have been
-	 * exporting for a long time so userspace might depend on it.
-	 */
-	if (badness != LONG_MIN)
-		points = (1000 + badness * 1000 / (long)totalpages) * 2 / 3;
-
 #ifdef CONFIG_RSBAC
 	union rsbac_target_id_t rsbac_target_id;
 	union rsbac_attribute_value_t rsbac_attribute_value;
@@ -789,6 +779,15 @@ static int proc_oom_score(struct seq_file *m, struct pid_namespace *ns,
 		put_pid(rsbac_target_id.process);
 	}
 #endif
+
+	badness = oom_badness(task, totalpages);
+	/*
+	 * Special case OOM_SCORE_ADJ_MIN for all others scale the
+	 * badness value into [0, 2000] range which we have been
+	 * exporting for a long time so userspace might depend on it.
+	 */
+	if (badness != LONG_MIN)
+		points = (1000 + badness * 1000 / (long)totalpages) * 2 / 3;
 
 	seq_printf(m, "%lu\n", points);
 
@@ -1031,6 +1030,7 @@ struct mm_struct *proc_mem_open(struct inode *inode, unsigned int mode)
 #endif
 
 	if (task) {
+
 #ifdef CONFIG_RSBAC
 		rsbac_pr_debug(aef, "calling ADF\n");
 		if (mode & PTRACE_MODE_ATTACH)
@@ -1704,7 +1704,6 @@ static ssize_t proc_loginuid_write(struct file * file, const char __user * buf,
 	/* Don't let kthreads write their own loginuid */
 	if (current->flags & PF_KTHREAD)
 		return -EPERM;
-
 
 	rcu_read_lock();
 	if (current != pid_task(proc_pid(inode), PIDTYPE_PID)) {

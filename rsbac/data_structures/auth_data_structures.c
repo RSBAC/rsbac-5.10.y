@@ -3,7 +3,7 @@
 /* Implementation of AUTH data structures            */
 /* Author and (c) 1999-2020: Amon Ott <ao@rsbac.org> */
 /*                                                   */
-/* Last modified: 30/Mar/2020                        */
+/* Last modified: 29/Dec/2020                        */
 /*************************************************** */
 
 #include <linux/types.h>
@@ -1033,12 +1033,11 @@ static int auth_devices_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, auth_devices_proc_show, NULL);
 }
 
-static const struct file_operations auth_devices_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = auth_devices_proc_open,
-       .read           = seq_read,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops auth_devices_proc_ops = {
+       .proc_open	= auth_devices_proc_open,
+       .proc_read	= seq_read,
+       .proc_lseek	= seq_lseek,
+       .proc_release	= single_release,
 };
 
 static struct proc_dir_entry *auth_devices;
@@ -1171,12 +1170,11 @@ static int stats_auth_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, stats_auth_proc_show, NULL);
 }
 
-static const struct file_operations stats_auth_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = stats_auth_proc_open,
-       .read           = seq_read,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops stats_auth_proc_ops = {
+       .proc_open	= stats_auth_proc_open,
+       .proc_read	= seq_read,
+       .proc_lseek	= seq_lseek,
+       .proc_release	= single_release,
 };
 
 static struct proc_dir_entry *stats_auth;
@@ -1997,12 +1995,11 @@ static int auth_caplist_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, auth_caplist_proc_show, NULL);
 }
 
-static const struct file_operations auth_caplist_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = auth_caplist_proc_open,
-       .read           = seq_read,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops auth_caplist_proc_ops = {
+       .proc_open	= auth_caplist_proc_open,
+       .proc_read	= seq_read,
+       .proc_lseek	= seq_lseek,
+       .proc_release	= single_release,
 };
 
 static struct proc_dir_entry *auth_caplist;
@@ -2277,15 +2274,15 @@ int __init rsbac_init_auth(void)
 	auth_devices = proc_create("auth_devices",
 					S_IFREG | S_IRUGO,
 					proc_rsbac_root_p,
-					&auth_devices_proc_fops);
+					&auth_devices_proc_ops);
 	stats_auth = proc_create("stats_auth",
 					S_IFREG | S_IRUGO,
 					proc_rsbac_root_p,
-					&stats_auth_proc_fops);
+					&stats_auth_proc_ops);
 	auth_caplist = proc_create("auth_caplist",
 					S_IFREG | S_IRUGO,
 					proc_rsbac_root_p,
-					&auth_caplist_proc_fops);
+					&auth_caplist_proc_ops);
 #endif
 
 	rsbac_pr_debug(ds_auth, "Ready.\n");
