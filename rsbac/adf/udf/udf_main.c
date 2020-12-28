@@ -4,9 +4,9 @@
 /* Facility (ADF) - User Space Decision Facility     */
 /* File: rsbac/adf/udf/udf_main.c                    */
 /*                                                   */
-/* Author and (c) 1999-2019: Amon Ott <ao@rsbac.org> */
+/* Author and (c) 1999-2020: Amon Ott <ao@rsbac.org> */
 /*                                                   */
-/* Last modified: 23/Oct/2019                        */
+/* Last modified: 29/Dec/2020                        */
 /*************************************************** */
 
 #include <linux/init.h>
@@ -189,13 +189,12 @@ static int udf_checker_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, udf_checker_proc_show, NULL);
 }
 
-static const struct file_operations udf_checker_proc_fops = {
-       .owner          = THIS_MODULE,
-       .open           = udf_checker_proc_open,
-       .read           = seq_read,
-       .write          = udf_checker_proc_write,
-       .llseek         = seq_lseek,
-       .release        = single_release,
+static const struct proc_ops udf_checker_proc_ops = {
+       .proc_open	= udf_checker_proc_open,
+       .proc_read	= seq_read,
+       .proc_write	= udf_checker_proc_write,
+       .proc_lseek	= seq_lseek,
+       .proc_release	= single_release,
 };
 
 static struct proc_dir_entry *udf_checker;
@@ -431,7 +430,7 @@ int __init rsbac_init_udf(void)
 		rsbac_printk(KERN_DEBUG "rsbac_init_udf(): rsbac_udf_nokill is set, checker is not killable\n");
 
 	#if defined(CONFIG_RSBAC_PROC)
-	udf_checker = proc_create("udf_checker", S_IFREG | S_IRUGO | S_IWUGO, proc_rsbac_root_p, &udf_checker_proc_fops);
+	udf_checker = proc_create("udf_checker", S_IFREG | S_IRUGO | S_IWUGO, proc_rsbac_root_p, &udf_checker_proc_ops);
 	#endif
 
 	return 0;
