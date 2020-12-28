@@ -379,6 +379,10 @@ int main(void)
 #endif
 #endif
 
+#ifdef CONFIG_RSBAC
+	DEFINE(CLONE_KTHREAD, CLONE_KTHREAD);
+#endif
+
 #ifndef CONFIG_PPC64
 	OFFSET(MM_PGD, mm_struct, pgd);
 #endif /* ! CONFIG_PPC64 */
