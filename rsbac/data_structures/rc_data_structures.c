@@ -3,7 +3,7 @@
 /* Implementation of RC data structures              */
 /* Author and (C) 1999-2020: Amon Ott <ao@rsbac.org> */
 /*                                                   */
-/* Last modified: 30/Mar/2020                        */
+/* Last modified: 29/Dec/2020                        */
 /*************************************************** */
 
 #include <linux/string.h>
@@ -368,12 +368,11 @@ static int stats_rc_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, stats_rc_proc_show, NULL);
 }
 
-static const struct file_operations stats_rc_proc_fops = {
-	.owner		= THIS_MODULE,
-	.open		= stats_rc_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
+static const struct proc_ops stats_rc_proc_ops = {
+	.proc_open	= stats_rc_proc_open,
+	.proc_read	= seq_read,
+	.proc_lseek	= seq_lseek,
+	.proc_release	= single_release,
 };
 
 static struct proc_dir_entry *stats_rc;
@@ -2635,7 +2634,7 @@ int __init rsbac_init_rc(void)
 #if defined(CONFIG_RSBAC_PROC)
 	stats_rc = proc_create("stats_rc",
 					S_IFREG | S_IRUGO,
-					proc_rsbac_root_p, &stats_rc_proc_fops);
+					proc_rsbac_root_p, &stats_rc_proc_ops);
 #endif
 	rsbac_pr_debug(stack, "final free stack: %lu\n",
 		       rsbac_stack_free_space());
