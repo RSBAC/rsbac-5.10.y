@@ -2566,6 +2566,13 @@ pid_t kernel_clone(struct kernel_clone_args *args)
 	int trace = 0;
 	pid_t nr;
 
+#ifdef CONFIG_RSBAC
+	union rsbac_target_id_t rsbac_target_id;
+	union rsbac_target_id_t rsbac_new_target_id;
+	enum  rsbac_attribute_t rsbac_attribute;
+	union rsbac_attribute_value_t rsbac_attribute_value;
+#endif
+
 	/*
 	 * For legacy clone() calls, CLONE_PIDFD uses the parent_tid argument
 	 * to return the pidfd. Hence, CLONE_PIDFD and CLONE_PARENT_SETTID are
@@ -2579,13 +2586,6 @@ pid_t kernel_clone(struct kernel_clone_args *args)
 	    (args->flags & CLONE_PARENT_SETTID) &&
 	    (args->pidfd == args->parent_tid))
 		return -EINVAL;
-
-#ifdef CONFIG_RSBAC
-	union rsbac_target_id_t rsbac_target_id;
-	union rsbac_target_id_t rsbac_new_target_id;
-	enum  rsbac_attribute_t rsbac_attribute;
-	union rsbac_attribute_value_t rsbac_attribute_value;
-#endif
 
 #ifdef CONFIG_RSBAC
 	rsbac_attribute = A_none;
@@ -2687,10 +2687,6 @@ pid_t kernel_clone(struct kernel_clone_args *args)
 	return nr;
 }
 
-#ifdef CONFIG_RSBAC
-long do_fork(unsigned long long clone_flags,
-#else
-#endif
 /*
  * Create a kernel thread.
  */

@@ -1313,24 +1313,25 @@ static int inet_diag_rcv_msg_compat(struct sk_buff *skb, struct nlmsghdr *nlh)
 		return -EINVAL;
 
 	if (nlh->nlmsg_flags & NLM_F_DUMP) {
-
-#ifdef CONFIG_RSBAC_NET
-			rsbac_pr_debug(aef, "calling ADF\n");
-			rsbac_target_id.scd = ST_network;
-			rsbac_attribute_value.dummy = 0;
-			if (!rsbac_adf_request(R_MODIFY_SYSTEM_DATA,
-					task_pid(current),
-					T_SCD,
-					rsbac_target_id,
-					A_none,
-					rsbac_attribute_value))
-				return -EPERM;
-#endif
 		struct netlink_dump_control c = {
 			.start = inet_diag_dump_start_compat,
 			.done = inet_diag_dump_done,
 			.dump = inet_diag_dump_compat,
 		};
+
+#ifdef CONFIG_RSBAC_NET
+		rsbac_pr_debug(aef, "calling ADF\n");
+		rsbac_target_id.scd = ST_network;
+		rsbac_attribute_value.dummy = 0;
+		if (!rsbac_adf_request(R_MODIFY_SYSTEM_DATA,
+					task_pid(current),
+					T_SCD,
+					rsbac_target_id,
+					A_none,
+					rsbac_attribute_value))
+			return -EPERM;
+#endif
+
 		return netlink_dump_start(net->diag_nlsk, skb, nlh, &c);
 	}
 
