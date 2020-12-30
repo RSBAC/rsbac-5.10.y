@@ -2699,7 +2699,7 @@ static int do_rsbac_sec_trunc(struct dentry * dentry_p,
 #endif
 	while (new_len < old_len)
 	{
-	        tmperr = kernel_write(&file, buffer, rsbac_min(RSBAC_SEC_DEL_CHUNK_SIZE, old_len-new_len), &file.f_pos);
+	        tmperr = __kernel_write(&file, buffer, rsbac_min(RSBAC_SEC_DEL_CHUNK_SIZE, old_len-new_len), &file.f_pos);
 		if (tmperr < 0) {
 			err = tmperr;
 			break;
