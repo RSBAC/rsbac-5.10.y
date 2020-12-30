@@ -5,7 +5,7 @@
 /* (some smaller parts copied from fs/namei.c        */
 /*  and others)                                      */
 /*                                                   */
-/* Last modified: 29/Dec/2020                        */
+/* Last modified: 30/Dec/2020                        */
 /*************************************************** */
 
 #include <linux/types.h>
@@ -2363,7 +2363,7 @@ static struct rsbac_device_list_item_t
 
 /* Add an existing device item to list. Locking needed. */
 static struct rsbac_device_list_item_t
-*add_device_item(struct rsbac_device_list_item_t *device_p)
+*add_device_item(struct rsbac_device_list_item_t *device_p, rsbac_boolean_t may_sync)
 {
 	struct rsbac_device_list_head_t * new_p;
 	struct rsbac_device_list_head_t * old_p;
@@ -2395,8 +2395,12 @@ static struct rsbac_device_list_item_t
 	}
 	rcu_assign_pointer(device_head_p[hash], new_p);
 	spin_unlock(&device_list_locks[hash]);
-	synchronize_srcu(&device_list_srcu[hash]);
-	rsbac_kfree(old_p);
+	if (may_sync) {
+		synchronize_srcu(&device_list_srcu[hash]);
+		rsbac_kfree(old_p);
+	} else {
+		rsbac_delayed_kfree(old_p, 10);
+	}
 	return device_p;
 }
 
@@ -6367,7 +6371,7 @@ static int __init rsbac_do_init(void)
 	}
 	/* Add new_device_p to device list */
 	/* OK, go on */
-	device_p = add_device_item(new_device_p);
+	device_p = add_device_item(new_device_p, TRUE);
 	if (!device_p) {
 		rsbac_printk(KERN_CRIT
 			     "rsbac_do_init(): Could not add device!\n");
@@ -7231,7 +7235,7 @@ static int rsbac_automount(__u32 major, __u32 minor)
 		clear_device_item(new_device_p);
 		return 0;
 	}
-	device_p = add_device_item(new_device_p);
+	device_p = add_device_item(new_device_p, FALSE);
 	if (!device_p) {
 		rsbac_mount_pid = NULL;
 		rsbac_printk(KERN_WARNING "rsbac_automount: adding device %02u:%02u failed!\n",
@@ -7466,7 +7470,7 @@ int rsbac_mount(struct vfsmount * vfsmount_p, struct vfsmount * vfsmount_parent_
 			clear_device_item(new_device_p);
 		} else {
 			srcu_read_unlock(&device_list_srcu[hash], srcu_idx);
-			device_p = add_device_item(new_device_p);
+			device_p = add_device_item(new_device_p, TRUE);
 			if (!device_p) {
 				rsbac_mount_pid = NULL;
 				rsbac_printk(KERN_WARNING "rsbac_mount: adding device %02u:%02u failed!\n",
