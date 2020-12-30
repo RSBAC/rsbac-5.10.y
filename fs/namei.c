@@ -3859,7 +3859,7 @@ static struct file *path_openat(struct nameidata *nd,
 		       (s = open_last_lookups(nd, file, op)) != NULL) {
 
 #ifdef CONFIG_RSBAC
-			if (nd->path.dentry->d_sb) {
+			if (nd && nd->path.dentry && !IS_ERR(nd->path.dentry) && nd->path.dentry->d_inode && nd->path.dentry->d_sb && !IS_ERR(nd->path.dentry->d_sb)) {
 				rsbac_target_id.symlink.device = nd->path.dentry->d_sb->s_dev;
 				rsbac_target_id.symlink.inode  = nd->path.dentry->d_inode->i_ino;
 				rsbac_target_id.symlink.dentry_p = nd->path.dentry;
