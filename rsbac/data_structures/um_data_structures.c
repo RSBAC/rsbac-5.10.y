@@ -1,9 +1,9 @@
 /*************************************************** */
 /* Rule Set Based Access Control                     */
 /* Implementation of User Management data structures */
-/* Author and (c) 1999-2020: Amon Ott <ao@rsbac.org> */
+/* Author and (c) 1999-2021: Amon Ott <ao@rsbac.org> */
 /*                                                   */
-/* Last modified: 29/Dec/2020                        */
+/* Last modified: 07/Jan/2021                        */
 /*************************************************** */
 
 #include <linux/types.h>
@@ -1347,21 +1347,22 @@ int rsbac_um_add_gm(rsbac_list_ta_number_t ta_number,
 		rsbac_printk(KERN_WARNING "rsbac_um_add_gm(): RSBAC not initialized\n");
 		return (-RSBAC_ENOTINITIALIZED);
 	}
+	rsbac_pr_debug(aef_um, "pid %u(%s): adding user %u group %u\n",
+		current->pid, current->comm, user, group);
 #ifdef CONFIG_RSBAC_UM_EXCL
 	if (!rsbac_um_no_excl) {
         	rsbac_gid_t gid = RSBAC_GEN_GID(RSBAC_UID_SET(user),
 					group);
 
-		if (!rsbac_ta_list_exist
-		    (ta_number, user_handle, &user)) {
+		if (!rsbac_ta_list_lol_exist(ta_number, user_handle, &user)) {
 #ifdef CONFIG_RSBAC_UM_VIRTUAL
 			if (RSBAC_UID_SET(user))
 				rsbac_printk(KERN_INFO "rsbac_um_add_gm(): uid %u/%u not known to RSBAC User Management!\n",
-				     RSBAC_UID_SET(user), RSBAC_UID_NUM(user));
-		else
+					     RSBAC_UID_SET(user), RSBAC_UID_NUM(user));
+			else
 #endif
-			rsbac_printk(KERN_INFO "rsbac_um_add_gm(): uid %u not known to RSBAC User Management!\n",
-				     RSBAC_UID_NUM(user));
+				rsbac_printk(KERN_INFO "rsbac_um_add_gm(): uid %u not known to RSBAC User Management!\n",
+					     RSBAC_UID_NUM(user));
 			return -RSBAC_ENOTFOUND;
 		}
 		if (!rsbac_ta_list_exist
@@ -1378,8 +1379,6 @@ int rsbac_um_add_gm(rsbac_list_ta_number_t ta_number,
 		}
 	}
 #endif
-	rsbac_pr_debug(aef_um, "pid %u(%s): adding user %u group %u\n",
-		current->pid, current->comm, user, group);
 	return rsbac_ta_list_lol_subadd_ttl(ta_number,
 					    user_handle,
 					    ttl, &user, &group, NULL);
@@ -1805,8 +1804,7 @@ int rsbac_um_get_user_item(rsbac_list_ta_number_t ta_number,
 	}
 	if (!data_p)
 		return -RSBAC_EINVALIDPOINTER;
-	if (!rsbac_ta_list_lol_exist
-	    (ta_number, user_handle, &user))
+	if (!rsbac_ta_list_lol_exist(ta_number, user_handle, &user))
 		return -RSBAC_ENOTFOUND;
 	if (mod == UM_ttl)
 		return rsbac_ta_list_lol_get_data_ttl(ta_number,
