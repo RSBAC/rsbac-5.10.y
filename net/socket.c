@@ -2413,7 +2413,7 @@ int __sys_connect_file(struct file *file, struct sockaddr_storage *address,
 		rsbac_target_id.netobj.sock_p = sock;
 		rsbac_target_id.netobj.local_addr = NULL;
 		rsbac_target_id.netobj.local_len = 0;
-		rsbac_target_id.netobj.remote_addr = (struct sockaddr *)&address;
+		rsbac_target_id.netobj.remote_addr = (struct sockaddr *)address;
 		rsbac_target_id.netobj.remote_len = addrlen;
 		rsbac_attribute_value.sock_type = sock->type;
 		if (!rsbac_adf_request(R_CONNECT,
