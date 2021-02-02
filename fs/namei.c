@@ -3284,12 +3284,10 @@ static struct dentry *atomic_open(struct nameidata *nd, struct dentry *dentry,
 	d_lookup_done(dentry);
 	if (!error) {
 		if (file->f_mode & FMODE_OPENED) {
-			if (unlikely(dentry != file->f_path.dentry)) {
-				dput(dentry);
-				dentry = dget(file->f_path.dentry);
 
-				/* RSBAC: notify ADF of new file */
+			/* RSBAC: notify ADF of new file */
 #ifdef CONFIG_RSBAC
+			if (file->f_mode & FMODE_CREATED) {
 				if (rsbac_target != T_NONE) {
 					rsbac_new_target = T_FILE;
 					rsbac_new_target_id.file.device = dentry->d_sb->s_dev;
@@ -3307,8 +3305,12 @@ static struct dentry *atomic_open(struct nameidata *nd, struct dentry *dentry,
 						"atomic_open() [lookup_open() [do_last() [path_openat() [do_filp_open()]]]]: rsbac_adf_set_attr() returned error");
 					}
 				}
+			}
 #endif
 
+			if (unlikely(dentry != file->f_path.dentry)) {
+				dput(dentry);
+				dentry = dget(file->f_path.dentry);
 			}
 		} else if (WARN_ON(file->f_path.dentry == DENTRY_NOT_SET)) {
 			error = -EIO;
