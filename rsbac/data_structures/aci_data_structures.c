@@ -1,11 +1,11 @@
 /*************************************************** */
 /* Rule Set Based Access Control                     */
 /* Implementation of ACI data structures             */
-/* Author and (c) 1999-2020: Amon Ott <ao@rsbac.org> */
+/* Author and (c) 1999-2021: Amon Ott <ao@rsbac.org> */
 /* (some smaller parts copied from fs/namei.c        */
 /*  and others)                                      */
 /*                                                   */
-/* Last modified: 30/Dec/2020                        */
+/* Last modified: 10/Mar/2021                        */
 /*************************************************** */
 
 #include <linux/types.h>
@@ -529,7 +529,6 @@ static int rsbac_aci_path_open(__u32 major, __u32 minor, rsbac_boolean_t create_
 		ksys_close(root_fd);
 		rsbac_printk(KERN_WARNING "rsbac_aci_path_open(): creating %s dir on device %02u:%02u failed with error %li\n",
 			     RSBAC_ACI_PATH, major, minor, PTR_ERR(dentry));
-		done_path_create(&path, dentry);
 		return -RSBAC_ENOTFOUND;
 	}
 	dir_fd = vfs_mknod(path.dentry->d_inode, dentry, 0, MKDEV(major, minor));
