@@ -679,7 +679,7 @@ char * u32tostrcap(char * str, __u32 i)
       return(NULL);
 
     k = 1;
-    for(j = CAP_NONE - 1;j >= 0;j--)
+    for(j = RSBAC_CAP_NONE - 1;j >= 0;j--)
       {
         if (i & k)
           str[j] = '1';
@@ -688,7 +688,7 @@ char * u32tostrcap(char * str, __u32 i)
         k<<=1;
       };
 
-    str[CAP_NONE] = 0;
+    str[RSBAC_CAP_NONE] = 0;
     return (str);
   };
 int kcaptostrcap(char * str, rsbac_cap_vector_t i)
@@ -701,7 +701,7 @@ int kcaptostrcap(char * str, rsbac_cap_vector_t i)
       return(-1);
 
     k = 1;
-    for(j = CAP_NONE - 1;j >= 32;j--)
+    for(j = RSBAC_CAP_NONE - 1;j >= 32;j--)
       {
         if (i.cap[1] & k)
           str[j-32] = '1';
@@ -710,7 +710,7 @@ int kcaptostrcap(char * str, rsbac_cap_vector_t i)
         k<<=1;
       };
     k = 1;
-    off = CAP_NONE-32;
+    off = RSBAC_CAP_NONE-32;
     for(j = 31+off;j >= off;j--)
       {
         if (i.cap[0] & k)
@@ -720,7 +720,7 @@ int kcaptostrcap(char * str, rsbac_cap_vector_t i)
         k<<=1;
       };
 
-    str[CAP_NONE] = 0;
+    str[RSBAC_CAP_NONE] = 0;
 
     return 0;
   };
@@ -733,10 +733,10 @@ int strcaptokcap(char * str, rsbac_cap_vector_t * i)
     
     if(!str)
       return -1;
-    if (strlen(str) < CAP_NONE)
+    if (strlen(str) < RSBAC_CAP_NONE)
       return -1;
 
-    for(j = CAP_NONE-1; j >= 32; j--)
+    for(j = RSBAC_CAP_NONE-1; j >= 32; j--)
       {
         if(str[j-32] != '0')
           {
@@ -745,14 +745,14 @@ int strcaptokcap(char * str, rsbac_cap_vector_t * i)
         k <<= 1;
       }
     k = 1;
-    off = CAP_NONE-32;
+    off = RSBAC_CAP_NONE-32;
 	for(j =31+off ;j >= off; j--) {
 		if(str[j] != '0') {
 			i->cap[0] |= k;
 		}
 		k <<= 1;
 	}
-/*    for(j=CAP_NONE;j<32;j++)
+/*    for(j=RSBAC_CAP_NONE;j<32;j++)
       {
         res |= k;
         k <<= 1;
@@ -769,9 +769,9 @@ __u32 strtou32cap(char * str, __u32 * i_p)
     if(!str)
       return(0);
 
-    if (strlen(str) < CAP_NONE)
+    if (strlen(str) < RSBAC_CAP_NONE)
       return(-1);
-    for(j=CAP_NONE-1;j>=0;j--)
+    for(j=RSBAC_CAP_NONE-1;j>=0;j--)
       {
         if(str[j] != '0')
           {
@@ -779,7 +779,7 @@ __u32 strtou32cap(char * str, __u32 * i_p)
           }
         k <<= 1;
       }
-    for(j=CAP_NONE;j<32;j++)
+    for(j=RSBAC_CAP_NONE;j<32;j++)
       {
         res |= k;
         k <<= 1;
