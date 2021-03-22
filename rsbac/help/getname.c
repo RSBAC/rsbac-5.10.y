@@ -1,9 +1,9 @@
 /************************************* */
 /* Rule Set Based Access Control       */
-/* Author and (c) 1999-2020:           */
+/* Author and (c) 1999-2021:           */
 /*   Amon Ott <ao@rsbac.org>           */
 /* Helper functions for all parts      */
-/* Last modified: 22/Apr/2020          */
+/* Last modified: 22/Mar/2021          */
 /************************************* */
 
 #include <rsbac/types.h>
@@ -632,7 +632,7 @@ static char log_level_list[LL_invalid + 1][9] = {
 	"invalid!"
 };
 
-static char cap_list[RSBAC_CAP_MAX + 1][17] = {
+static char cap_list[RSBAC_CAP_NONE + 1][19] = {
 	"CHOWN",
 	"DAC_OVERRIDE",
 	"DAC_READ_SEARCH",
@@ -667,6 +667,13 @@ static char cap_list[RSBAC_CAP_MAX + 1][17] = {
 	"SETFCAP",
 	"MAC_OVERRIDE",
 	"MAC_ADMIN",
+	"SYSLOG",
+	"WAKE_ALARM",
+	"BLOCK_SUSPEND",
+	"AUDIT_READ",
+	"PERFMON",
+	"BPF",
+	"CHECKPOINT_RESTORE",
 	"NONE"
 };
 
@@ -1977,7 +1984,7 @@ char *get_cap_name(char *name, u_int value)
 {
 	if (!name)
 		return (NULL);
-	if (value > CAP_NONE)
+	if (value > RSBAC_CAP_NONE)
 		strcpy(name, "ERROR!");
 	else
 		strcpy(name, cap_list[value]);
@@ -1989,11 +1996,11 @@ int get_cap_nr(const char *name)
 	int i;
 
 	if (!name)
-		return (CAP_NONE);
-	for (i = 0; i < CAP_NONE; i++) {
+		return (RSBAC_CAP_NONE);
+	for (i = 0; i < RSBAC_CAP_NONE; i++) {
 		if (!strcasecmp(name, cap_list[i])) {
 			return (i);
 		}
 	}
-	return (CAP_NONE);
+	return (RSBAC_CAP_NONE);
 }
