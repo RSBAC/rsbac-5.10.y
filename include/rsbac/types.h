@@ -1,10 +1,10 @@
 /*********************************** */
 /* Rule Set Based Access Control     */
-/* Author and (c)1999-2020:          */
+/* Author and (c)1999-2021:          */
 /*   Amon Ott <ao@rsbac.org>         */
 /* API: Data types for attributes    */
 /*      and standard module calls    */
-/* Last modified: 22/Apr/2020        */
+/* Last modified: 22/Mar/2021        */
 /*********************************** */
 
 #ifndef __RSBAC_TYPES_H
@@ -439,8 +439,7 @@ typedef rsbac_enum_t rsbac_cap_ld_env_int_t;
 #define RSBAC_CAP_DEFAULT_MAX (__u32) -1
 
 #include <linux/capability.h>
-#define CAP_NONE 34
-#define RSBAC_CAP_MAX CAP_NONE
+#define RSBAC_CAP_NONE (CAP_CHECKPOINT_RESTORE + 1)
 
 /**** JAIL ****/
 
