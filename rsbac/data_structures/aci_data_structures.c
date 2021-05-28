@@ -524,7 +524,7 @@ static int rsbac_aci_path_open(__u32 major, __u32 minor, rsbac_boolean_t create_
 		ksys_close(root_fd);
 		return -RSBAC_ENOTWRITABLE;
 	}
-	dentry = kern_path_create(AT_FDCWD, RSBAC_ACI_PATH, &path, 0);
+	dentry = kern_path_create(AT_FDCWD, RSBAC_ACI_PATH, &path, LOOKUP_DIRECTORY);
 	if (IS_ERR(dentry)) {
 		ksys_close(root_fd);
 		rsbac_printk(KERN_WARNING "rsbac_aci_path_open(): creating %s dir on device %02u:%02u failed with error %li\n",
