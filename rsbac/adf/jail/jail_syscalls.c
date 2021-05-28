@@ -184,10 +184,9 @@ dput_and_out:
 		if (err)
 			return err;
 
+		spin_lock(&files->file_lock);
 restart:
-		rcu_read_lock();
 		fdt = files_fdtable(files);
-		fdt = rcu_dereference((files)->fdt);
 
 		for(fd=0; fd < fdt->max_fds; fd++)
 		{
@@ -220,12 +219,11 @@ restart:
 				if(filename)
 					rsbac_kfree(filename);
 
-				rcu_read_unlock();
 				ksys_close(fd);
 				goto restart;
 			}
 		}
-		rcu_read_unlock();
+		spin_unlock(&files->file_lock);
 	}
 
 	/* Set jail_id for this process - number might wrap, so better check */
