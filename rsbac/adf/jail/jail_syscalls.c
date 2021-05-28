@@ -184,8 +184,8 @@ dput_and_out:
 		if (err)
 			return err;
 
-		spin_lock(&files->file_lock);
 restart:
+		spin_lock(&files->file_lock);
 		fdt = files_fdtable(files);
 
 		for(fd=0; fd < fdt->max_fds; fd++)
@@ -209,6 +209,7 @@ restart:
 					rsbac_get_full_path(file->f_path.dentry, filename, RSBAC_MAXNAMELEN);
 #endif
 
+				spin_unlock(&files->file_lock);
 				rsbac_printk(KERN_INFO
 						"rsbac_jail_sys_jail(): avoid possible chroot breakout by closing open dir fd %u, inode %lu, device %02u:%02u, path %s\n",
 						fd,
