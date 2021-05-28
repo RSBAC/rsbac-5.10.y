@@ -161,37 +161,39 @@ int vfs_getattr(const struct path *path, struct kstat *stat,
 		return retval;
 
 #ifdef CONFIG_RSBAC
-	rsbac_pr_debug(aef, "[sys_stat() etc.]: calling ADF\n");
-	rsbac_target_id.file.device = path->dentry->d_inode->i_sb->s_dev;
-	rsbac_target_id.file.inode  = path->dentry->d_inode->i_ino;
-	rsbac_target_id.file.dentry_p = path->dentry;
-	if (S_ISDIR(path->dentry->d_inode->i_mode))
-		rsbac_target = T_DIR;
-	else if (S_ISFIFO(path->dentry->d_inode->i_mode))
-		rsbac_target = T_FIFO;
-	else if (S_ISLNK(path->dentry->d_inode->i_mode))
-		rsbac_target = T_SYMLINK;
-	else if (S_ISSOCK(path->dentry->d_inode->i_mode)) {
-		if (path->dentry->d_inode->i_sb->s_magic == SOCKFS_MAGIC) {
-			rsbac_target = T_IPC;
-			rsbac_target_id.ipc.type = I_anonunix;
-			rsbac_target_id.ipc.id.id_nr = path->dentry->d_inode->i_ino;
-		} else {
-			rsbac_target = T_UNIXSOCK;
-			rsbac_target_id.unixsock.device = path->dentry->d_inode->i_sb->s_dev;
-			rsbac_target_id.unixsock.inode  = path->dentry->d_inode->i_ino;
-			rsbac_target_id.unixsock.dentry_p = path->dentry;
+	if (path->dentry && path->dentry->d_inode && path->dentry->d_inode->i_sb) {
+		rsbac_pr_debug(aef, "[sys_stat() etc.]: calling ADF\n");
+		rsbac_target_id.file.device = path->dentry->d_inode->i_sb->s_dev;
+		rsbac_target_id.file.inode  = path->dentry->d_inode->i_ino;
+		rsbac_target_id.file.dentry_p = path->dentry;
+		if (S_ISDIR(path->dentry->d_inode->i_mode))
+			rsbac_target = T_DIR;
+		else if (S_ISFIFO(path->dentry->d_inode->i_mode))
+			rsbac_target = T_FIFO;
+		else if (S_ISLNK(path->dentry->d_inode->i_mode))
+			rsbac_target = T_SYMLINK;
+		else if (S_ISSOCK(path->dentry->d_inode->i_mode)) {
+			if (path->dentry->d_inode->i_sb->s_magic == SOCKFS_MAGIC) {
+				rsbac_target = T_IPC;
+				rsbac_target_id.ipc.type = I_anonunix;
+				rsbac_target_id.ipc.id.id_nr = path->dentry->d_inode->i_ino;
+			} else {
+				rsbac_target = T_UNIXSOCK;
+				rsbac_target_id.unixsock.device = path->dentry->d_inode->i_sb->s_dev;
+				rsbac_target_id.unixsock.inode  = path->dentry->d_inode->i_ino;
+				rsbac_target_id.unixsock.dentry_p = path->dentry;
+			}
+		} else
+			rsbac_target = T_FILE;
+		rsbac_attribute_value.dummy = 0;
+		if (!rsbac_adf_request(R_GET_STATUS_DATA,
+					task_pid(current),
+					rsbac_target,
+					rsbac_target_id,
+					A_none,
+					rsbac_attribute_value)) {
+			return -EPERM;
 		}
-	} else
-		rsbac_target = T_FILE;
-	rsbac_attribute_value.dummy = 0;
-	if (!rsbac_adf_request(R_GET_STATUS_DATA,
-				task_pid(current),
-				rsbac_target,
-				rsbac_target_id,
-				A_none,
-				rsbac_attribute_value)) {
-		return -EPERM;
 	}
 #endif
 
