@@ -1331,14 +1331,15 @@ log:
 #endif
 
 #ifdef CONFIG_RSBAC_LOG_PROGRAM_FILE
-	file_p = get_task_exe_file(current);
-	if(file_p) {
-	  if(file_p->f_path.dentry) {
-            char * p = program_path;
+        if (current->mm && !(current->flags & PF_KTHREAD)) {
+	  file_p = get_mm_exe_file(current->mm);
+	  if(file_p) {
+	    if(file_p->f_path.dentry) {
+              char * p = program_path;
 
-            p += sprintf(program_path, ", prog_file ");
+              p += sprintf(program_path, ", prog_file ");
 #ifdef CONFIG_RSBAC_LOG_FULL_PATH
-            rsbac_get_full_path(file_p->f_path.dentry, p, CONFIG_RSBAC_MAX_PATH_LEN);
+              rsbac_get_full_path(file_p->f_path.dentry, p, CONFIG_RSBAC_MAX_PATH_LEN);
 #else
 		if (   file_p->f_path.dentry->d_name.len
 		    && file_p->f_path.dentry->d_name.name
@@ -1351,8 +1352,9 @@ log:
 			sprintf(program_name, "%s", current->comm);
 		}
 #endif
+            }
+            fput(file_p);
           }
-          fput(file_p);
         }
 #endif
 
