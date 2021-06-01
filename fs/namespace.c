@@ -1725,6 +1725,7 @@ static int do_umount(struct mount *mnt, int flags)
 	}
 out:
 	unlock_mount_hash();
+	namespace_unlock();
 
 #ifdef CONFIG_RSBAC
 	/* RSBAC: umount failed, so reread data structures for this fs from disk */
@@ -1736,7 +1737,6 @@ out:
 	}
 #endif
 
-	namespace_unlock();
 	return retval;
 }
 
