@@ -5,7 +5,7 @@
 /* (some smaller parts copied from fs/namei.c        */
 /*  and others)                                      */
 /*                                                   */
-/* Last modified: 10/Mar/2021                        */
+/* Last modified: 01/Jun/2021                        */
 /*************************************************** */
 
 #include <linux/types.h>
@@ -462,6 +462,7 @@ static int rsbac_aci_path_open(__u32 major, __u32 minor, rsbac_boolean_t create_
 	struct open_how how = build_open_how(O_RDONLY, 0);
 	struct open_flags op;
 	struct path path;
+	struct path oldpwd;
 	struct dentry *dentry;
 
 	root_fd = get_unused_fd_flags(O_RDONLY);
@@ -489,7 +490,7 @@ static int rsbac_aci_path_open(__u32 major, __u32 minor, rsbac_boolean_t create_
 	dir_fd = build_open_flags(&how, &op);
 	if (dir_fd < 0) {
 		ksys_close(root_fd);
-		rsbac_printk(KERN_WARNING "rsbac_aci_path_open(): creating %s dir on device %02u:%02u failed with error %li\n",
+		rsbac_printk(KERN_WARNING "rsbac_aci_path_open(): build_open_flags() for %s dir on device %02u:%02u failed with error %li\n",
 			     RSBAC_ACI_PATH, major, minor, dir_fd);
 		return -RSBAC_ENOTFOUND;
 	}
@@ -524,16 +525,19 @@ static int rsbac_aci_path_open(__u32 major, __u32 minor, rsbac_boolean_t create_
 		ksys_close(root_fd);
 		return -RSBAC_ENOTWRITABLE;
 	}
+	get_fs_pwd(current->fs, &oldpwd);
+	set_fs_pwd(current->fs, &f->f_path);
 	dentry = kern_path_create(AT_FDCWD, RSBAC_ACI_PATH, &path, LOOKUP_DIRECTORY);
+	set_fs_pwd(current->fs, &oldpwd);
+	path_put(&oldpwd);
 	if (IS_ERR(dentry)) {
 		ksys_close(root_fd);
 		rsbac_printk(KERN_WARNING "rsbac_aci_path_open(): creating %s dir on device %02u:%02u failed with error %li\n",
 			     RSBAC_ACI_PATH, major, minor, PTR_ERR(dentry));
 		return -RSBAC_ENOTFOUND;
 	}
-	dir_fd = vfs_mknod(path.dentry->d_inode, dentry, 0, MKDEV(major, minor));
+	dir_fd = vfs_mkdir(path.dentry->d_inode, dentry, 0);
 	done_path_create(&path, dentry);
-
 	if (dir_fd < 0) {
 		ksys_close(root_fd);
 		rsbac_printk(KERN_WARNING "rsbac_aci_path_open(): creating %s dir on device %02u:%02u failed with error %li\n",
