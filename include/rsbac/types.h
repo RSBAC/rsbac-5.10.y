@@ -4,7 +4,7 @@
 /*   Amon Ott <ao@rsbac.org>         */
 /* API: Data types for attributes    */
 /*      and standard module calls    */
-/* Last modified: 22/Mar/2021        */
+/* Last modified: 20/Sep/2021        */
 /*********************************** */
 
 #ifndef __RSBAC_TYPES_H
@@ -15,10 +15,10 @@
 #ifdef CONFIG_MODULES
 #endif
 
-#define RSBAC_VERSION "1.5.5"
+#define RSBAC_VERSION "1.5.6"
 #define RSBAC_VERSION_MAJOR 1
 #define RSBAC_VERSION_MID 5
-#define RSBAC_VERSION_MINOR 5
+#define RSBAC_VERSION_MINOR 6
 #define RSBAC_VERSION_NR \
  ((RSBAC_VERSION_MAJOR << 16) | (RSBAC_VERSION_MID << 8) | RSBAC_VERSION_MINOR)
 #define RSBAC_VERSION_MAKE_NR(x,y,z) \
@@ -252,7 +252,7 @@ enum    rsbac_dev_type_t {D_block, D_char, D_block_major, D_char_major, D_none};
 
 
 enum    rsbac_ipc_type_t {I_sem, I_msg, I_shm, I_anonpipe, I_mqueue,
-				I_anonunix, I_none};
+				I_anonunix, I_memfd, I_none};
 union   rsbac_ipc_id_t
   {
     u_long id_nr;
@@ -815,6 +815,7 @@ enum rsbac_attribute_t
     A_auth_add_p_cap,
     A_auth_remove_p_cap,
     A_perf_flags,
+    A_memfd_name,
 #endif
     A_none};
 
@@ -935,6 +936,7 @@ union rsbac_attribute_value_t
          rsbac_boolean_t             rc_learn;
          struct inode              * old_dir_inode_p;
          u_long                      perf_flags;
+         char                      * memfd_name;
 #endif
          u_char                      u_char_dummy;
          u_short                     u_short_dummy;
