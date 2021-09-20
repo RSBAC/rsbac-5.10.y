@@ -57,7 +57,12 @@ long vfs_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		goto out;
 
 #ifdef CONFIG_RSBAC_IOCTL
-	if (S_ISBLK(filp->f_path.dentry->d_inode->i_mode)) {
+	if (filp->f_path.dentry->d_inode->i_rsbac_memfd) {
+		rsbac_target = T_IPC;
+		rsbac_target_id.ipc.type = I_memfd;
+		rsbac_target_id.ipc.id.id_nr = filp->f_path.dentry->d_inode->i_ino;
+	}
+	else if (S_ISBLK(filp->f_path.dentry->d_inode->i_mode)) {
 		rsbac_target = T_DEV;
 		rsbac_target_id.dev.type = D_block;
 		rsbac_target_id.dev.major = RSBAC_MAJOR(filp->f_path.dentry->d_inode->i_rdev);

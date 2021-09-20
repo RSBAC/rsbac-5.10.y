@@ -2062,16 +2062,6 @@ general_work:
 
 	case R_CLOSE:
 		switch (target) {
-#if 0
-		case T_IPC:
-			if(   (tid.ipc.type == I_anonunix)
-                           && (   (attr != A_nlink)
-                               || (attr_val.nlink <= 1)
-                              )
-                          )
-				rsbac_remove_target(target, tid);
-			break;
-#endif
 #ifdef CONFIG_RSBAC_NET_OBJ
 		case T_NETOBJ:
 			rsbac_remove_target(target, tid);

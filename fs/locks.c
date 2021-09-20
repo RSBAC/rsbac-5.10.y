@@ -2326,14 +2326,19 @@ SYSCALL_DEFINE2(flock, unsigned int, fd, unsigned int, cmd)
 		rsbac_target = T_FIFO;
 	else if (S_ISLNK(f.file->f_path.dentry->d_inode->i_mode))
 		rsbac_target = T_SYMLINK;
-        else if (S_ISSOCK(f.file->f_path.dentry->d_inode->i_mode)) {
-          if(f.file->f_path.dentry->d_sb->s_magic == SOCKFS_MAGIC) {
-            rsbac_target = T_IPC;
-            rsbac_target_id.ipc.type = I_anonunix;
-            rsbac_target_id.ipc.id.id_nr = f.file->f_path.dentry->d_inode->i_ino;
-          } else
-            rsbac_target = T_UNIXSOCK;
-        }
+	else if (f.file->f_path.dentry->d_inode->i_rsbac_memfd) {
+		rsbac_target = T_IPC;
+		rsbac_target_id.ipc.type = I_memfd;
+		rsbac_target_id.ipc.id.id_nr = f.file->f_path.dentry->d_inode->i_ino;
+	}
+	else if (S_ISSOCK(f.file->f_path.dentry->d_inode->i_mode)) {
+		if(f.file->f_path.dentry->d_sb->s_magic == SOCKFS_MAGIC) {
+			rsbac_target = T_IPC;
+			rsbac_target_id.ipc.type = I_anonunix;
+			rsbac_target_id.ipc.id.id_nr = f.file->f_path.dentry->d_inode->i_ino;
+		} else
+			rsbac_target = T_UNIXSOCK;
+	}
 	rsbac_attribute_value.dummy = 0;
 	if (!rsbac_adf_request(R_LOCK,
 				task_pid(current),
@@ -2684,6 +2689,11 @@ int fcntl_setlk(unsigned int fd, struct file *filp, unsigned int cmd,
 		rsbac_target = T_FIFO;
 	else if (S_ISLNK(inode->i_mode))
 		rsbac_target = T_SYMLINK;
+	else if (inode->i_rsbac_memfd) {
+		rsbac_target = T_IPC;
+		rsbac_target_id.ipc.type = I_memfd;
+		rsbac_target_id.ipc.id.id_nr = inode->i_ino;
+	}
 	else if (S_ISSOCK(filp->f_path.dentry->d_inode->i_mode)) {
 		if(filp->f_path.dentry->d_sb->s_magic == SOCKFS_MAGIC) {
 			rsbac_target = T_IPC;
@@ -2885,6 +2895,11 @@ int fcntl_setlk64(unsigned int fd, struct file *filp, unsigned int cmd,
 		rsbac_target = T_FIFO;
 	else if (S_ISLNK(inode->i_mode))
 		rsbac_target = T_SYMLINK;
+	else if (inode->i_rsbac_memfd) {
+		rsbac_target = T_IPC;
+		rsbac_target_id.ipc.type = I_memfd;
+		rsbac_target_id.ipc.id.id_nr = inode->i_ino;
+	}
 	else if (S_ISSOCK(filp->f_path.dentry->d_inode->i_mode)) {
 		if(filp->f_path.dentry->d_sb->s_magic == SOCKFS_MAGIC) {
 			rsbac_target = T_IPC;
