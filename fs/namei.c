@@ -3672,7 +3672,10 @@ static int do_open(struct nameidata *nd,
 			rsbac_target_id.dev.major = RSBAC_MAJOR(nd->path.dentry->d_inode->i_rdev);
 			rsbac_target_id.dev.minor = RSBAC_MINOR(nd->path.dentry->d_inode->i_rdev);
 		}
-		else { /* must be file, dir or fifo */
+		else { /* must be file, dir, fifo or memfd */
+			rsbac_target_id.file.device = nd->path.dentry->d_inode->i_sb->s_dev;
+			rsbac_target_id.file.inode  = nd->path.dentry->d_inode->i_ino;
+			rsbac_target_id.file.dentry_p = nd->path.dentry;
 			if (S_ISDIR(nd->path.dentry->d_inode->i_mode))
 				rsbac_target = T_DIR;
 			else if (S_ISSOCK(nd->path.dentry->d_inode->i_mode))
@@ -3683,12 +3686,13 @@ static int do_open(struct nameidata *nd,
 				else
 					rsbac_target = T_NONE;
 			}
+			else if (nd->path.dentry->d_inode->i_rsbac_memfd) {
+				rsbac_target = T_IPC;
+				rsbac_target_id.ipc.type = I_memfd;
+				rsbac_target_id.ipc.id.id_nr = nd->path.dentry->d_inode->i_ino;
+			}
 			else if (S_ISREG(nd->path.dentry->d_inode->i_mode))
 				rsbac_target = T_FILE;
-
-			rsbac_target_id.file.device = nd->path.dentry->d_inode->i_sb->s_dev;
-			rsbac_target_id.file.inode  = nd->path.dentry->d_inode->i_ino;
-			rsbac_target_id.file.dentry_p = nd->path.dentry;
 		}
 		/* determine request type */
 		rsbac_adf_req = R_NONE;
@@ -4496,22 +4500,23 @@ int vfs_unlink(struct inode *dir, struct dentry *dentry, struct inode **delegate
 
 #ifdef CONFIG_RSBAC
 			rsbac_pr_debug(aef, "vfs_unlink()[do_unlink() [sys_unlink()]]: calling ADF\n");
-			if (S_ISDIR(dentry->d_inode->i_mode))
-				rsbac_target = T_DIR;
-			else
-				if (S_ISFIFO(dentry->d_inode->i_mode))
-					rsbac_target = T_FIFO;
-				else
-					if (S_ISLNK(dentry->d_inode->i_mode))
-						rsbac_target = T_SYMLINK;
-					else
-						if (S_ISSOCK(dentry->d_inode->i_mode))
-							rsbac_target = T_UNIXSOCK;
-					else
-						rsbac_target = T_FILE;
 			rsbac_target_id.file.device = dentry->d_sb->s_dev;
 			rsbac_target_id.file.inode  = dentry->d_inode->i_ino;
 			rsbac_target_id.file.dentry_p = dentry;
+			if (S_ISDIR(dentry->d_inode->i_mode))
+				rsbac_target = T_DIR;
+			else if (S_ISFIFO(dentry->d_inode->i_mode))
+				rsbac_target = T_FIFO;
+			else if (S_ISLNK(dentry->d_inode->i_mode))
+				rsbac_target = T_SYMLINK;
+			else if (dentry->d_inode->i_rsbac_memfd) {
+				rsbac_target = T_IPC;
+				rsbac_target_id.ipc.type = I_memfd;
+				rsbac_target_id.ipc.id.id_nr = dentry->d_inode->i_ino;
+			} else if (S_ISSOCK(dentry->d_inode->i_mode))
+				rsbac_target = T_UNIXSOCK;
+			else
+				rsbac_target = T_FILE;
 			rsbac_attribute_value.nlink = dentry->d_inode->i_nlink;
 			if (!rsbac_adf_request(R_DELETE,
 						task_pid(current),
@@ -4829,6 +4834,9 @@ int vfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *new_de
 #ifdef CONFIG_RSBAC
 	rsbac_pr_debug(aef, "vfs_link() [do_link() [sys_link()]]: calling ADF\n");
 	rsbac_target = T_FILE;
+	rsbac_target_id.dir.device = old_dentry->d_sb->s_dev;
+	rsbac_target_id.dir.inode  = old_dentry->d_inode->i_ino;
+	rsbac_target_id.dir.dentry_p = old_dentry;
 	if (S_ISDIR (old_dentry->d_inode->i_mode))
 		rsbac_target = T_DIR;
 	else if (S_ISFIFO (old_dentry->d_inode->i_mode))
@@ -4837,9 +4845,11 @@ int vfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *new_de
 		rsbac_target = T_SYMLINK;
 	else if (S_ISSOCK (old_dentry->d_inode->i_mode))
 		rsbac_target = T_UNIXSOCK;
-	rsbac_target_id.dir.device = old_dentry->d_sb->s_dev;
-	rsbac_target_id.dir.inode  = old_dentry->d_inode->i_ino;
-	rsbac_target_id.dir.dentry_p = old_dentry;
+	else if (old_dentry->d_inode->i_rsbac_memfd) {
+		rsbac_target = T_IPC;
+		rsbac_target_id.ipc.type = I_memfd;
+		rsbac_target_id.ipc.id.id_nr = old_dentry->d_inode->i_ino;
+	}
 	rsbac_attribute_value.dummy = 0;
 	if (!rsbac_adf_request(R_LINK_HARD,
 				task_pid(current),
@@ -5116,17 +5126,21 @@ int vfs_rename(struct renamedata *rd)
 #ifdef CONFIG_RSBAC
 	rsbac_pr_debug(aef, "vfs_rename(): calling ADF\n");
 	rsbac_target = T_FILE;
+	rsbac_target_id.file.device = old_dentry->d_sb->s_dev;
+	rsbac_target_id.file.inode  = old_dentry->d_inode->i_ino;
+	rsbac_target_id.file.dentry_p = old_dentry;
 	if (S_ISDIR(old_dentry->d_inode->i_mode))
 		rsbac_target = T_DIR;
 	else if (S_ISFIFO (old_dentry->d_inode->i_mode))
 		rsbac_target = T_FIFO;
 	else if (S_ISLNK (old_dentry->d_inode->i_mode))
 		rsbac_target = T_SYMLINK;
-	else if (S_ISSOCK (old_dentry->d_inode->i_mode))
+	else if (old_dentry->d_inode->i_rsbac_memfd) {
+		rsbac_target = T_IPC;
+		rsbac_target_id.ipc.type = I_memfd;
+		rsbac_target_id.ipc.id.id_nr = old_dentry->d_inode->i_ino;
+	} else if (S_ISSOCK (old_dentry->d_inode->i_mode))
 		rsbac_target = T_UNIXSOCK;
-	rsbac_target_id.file.device = old_dentry->d_sb->s_dev;
-	rsbac_target_id.file.inode  = old_dentry->d_inode->i_ino;
-	rsbac_target_id.file.dentry_p = old_dentry;
 	rsbac_attribute_value.new_dir_dentry_p = new_dentry->d_parent;
 	if (!rsbac_adf_request(R_RENAME,
 				task_pid(current),
@@ -5170,17 +5184,21 @@ int vfs_rename(struct renamedata *rd)
 		target_exists = TRUE;
 		rsbac_pr_debug(aef, "vfs_rename(): calling ADF for DELETE on existing target\n");
 		rsbac_target2 = T_FILE;
+		rsbac_target_id2.file.device = new_dentry->d_sb->s_dev;
+		rsbac_target_id2.file.inode  = new_dentry->d_inode->i_ino;
+		rsbac_target_id2.file.dentry_p = new_dentry;
 		if (S_ISDIR(new_dentry->d_inode->i_mode))
 			rsbac_target2 = T_DIR;
 		else if (S_ISFIFO (new_dentry->d_inode->i_mode))
 			rsbac_target2 = T_FIFO;
 		else if (S_ISLNK (new_dentry->d_inode->i_mode))
 			rsbac_target2 = T_SYMLINK;
-		else if (S_ISSOCK (new_dentry->d_inode->i_mode))
+		else if (new_dentry->d_inode->i_rsbac_memfd) {
+			rsbac_target2 = T_IPC;
+			rsbac_target_id2.ipc.type = I_memfd;
+			rsbac_target_id2.ipc.id.id_nr = new_dentry->d_inode->i_ino;
+		} else if (S_ISSOCK (new_dentry->d_inode->i_mode))
 			rsbac_target2 = T_UNIXSOCK;
-		rsbac_target_id2.file.device = new_dentry->d_sb->s_dev;
-		rsbac_target_id2.file.inode  = new_dentry->d_inode->i_ino;
-		rsbac_target_id2.file.dentry_p = new_dentry;
 		rsbac_attribute_value2.nlink = new_dentry->d_inode->i_nlink;
 		if (!rsbac_adf_request(R_DELETE,
 					task_pid(current),
