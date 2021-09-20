@@ -172,6 +172,11 @@ int vfs_getattr(const struct path *path, struct kstat *stat,
 			rsbac_target = T_FIFO;
 		else if (S_ISLNK(path->dentry->d_inode->i_mode))
 			rsbac_target = T_SYMLINK;
+		else if (path->dentry->d_inode->i_rsbac_memfd) {
+			rsbac_target = T_IPC;
+			rsbac_target_id.ipc.type = I_memfd;
+			rsbac_target_id.ipc.id.id_nr = path->dentry->d_inode->i_ino;
+		}
 		else if (S_ISSOCK(path->dentry->d_inode->i_mode)) {
 			if (path->dentry->d_inode->i_sb->s_magic == SOCKFS_MAGIC) {
 				rsbac_target = T_IPC;

@@ -777,6 +777,11 @@ retry_deleg:
 			rsbac_target = T_FIFO;
 		else if (S_ISLNK(inode->i_mode))
 			rsbac_target = T_SYMLINK;
+		else if (inode->i_rsbac_memfd) {
+			rsbac_target = T_IPC;
+			rsbac_target_id.ipc.type = I_memfd;
+			rsbac_target_id.ipc.id.id_nr = inode->i_ino;
+		}
 		else if (S_ISSOCK(inode->i_mode)) {
 			if(inode->i_sb->s_magic == SOCKFS_MAGIC) {
 				rsbac_target = T_IPC;
@@ -1610,7 +1615,13 @@ int filp_close(struct file *filp, fl_owner_t id)
 			rsbac_target_id.dev.minor = RSBAC_MINOR(filp->f_path.dentry->d_sb->s_dev);
 			rsbac_attribute = A_f_mode;
 			rsbac_attribute_value.f_mode = filp->f_mode;
-		} else if (S_ISSOCK(filp->f_path.dentry->d_inode->i_mode)) {
+		}
+		else if (filp->f_path.dentry->d_inode->i_rsbac_memfd) {
+			rsbac_target = T_IPC;
+			rsbac_target_id.ipc.type = I_memfd;
+			rsbac_target_id.ipc.id.id_nr = filp->f_path.dentry->d_inode->i_ino;
+		}
+		else if (S_ISSOCK(filp->f_path.dentry->d_inode->i_mode)) {
 			if (filp->f_path.dentry->d_sb->s_magic == SOCKFS_MAGIC) {
 				rsbac_target = T_IPC;
 				rsbac_target_id.ipc.type = I_anonunix;

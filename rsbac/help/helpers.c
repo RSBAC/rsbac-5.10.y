@@ -1087,6 +1087,11 @@ int rsbac_handle_rw_req(const struct file *file, struct rsbac_rw_req *rsbac_rw_r
 			rsbac_rw_req_obj->rsbac_target_id.fifo.dentry_p = file->f_path.dentry;
 		}
 	} else
+	if (file->f_path.dentry->d_inode->i_rsbac_memfd) {
+		rsbac_rw_req_obj->rsbac_target = T_IPC;
+		rsbac_rw_req_obj->rsbac_target_id.ipc.type = I_memfd;
+		rsbac_rw_req_obj->rsbac_target_id.ipc.id.id_nr = file->f_path.dentry->d_inode->i_ino;
+	} else
 	if (S_ISREG(file->f_path.dentry->d_inode->i_mode)) {
 		rsbac_rw_req_obj->rsbac_target = T_FILE;
 		rsbac_rw_req_obj->rsbac_target_id.file.device = file->f_path.dentry->d_inode->i_sb->s_dev;
