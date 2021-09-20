@@ -3,7 +3,7 @@
 /* Author and (c) 1999-2021:           */
 /*   Amon Ott <ao@rsbac.org>           */
 /* Helper functions for all parts      */
-/* Last modified: 22/Mar/2021          */
+/* Last modified: 20/Sep/2021          */
 /************************************* */
 
 #include <rsbac/types.h>
@@ -390,6 +390,7 @@ static char attribute_list[A_none + 1][23] = {
 	"auth_add_p_cap",
 	"auth_remove_p_cap",
 	"perf_flags",
+	"memfd_name",
 #endif
 	"none"
 };
@@ -421,6 +422,7 @@ static char ipc_target_list[I_none + 1][9] = {
 	"anonpipe",
 	"mqueue",
 	"anonunix",
+	"memfd",
 	"none"
 };
 
@@ -1124,6 +1126,10 @@ char *get_attribute_value_name(char *attr_val_name,
 		case A_perf_flags:
 			sprintf(attr_val_name, "%lu", attr_val_p->perf_flags);
 			break;
+		case A_memfd_name:
+			snprintf(attr_val_name, RSBAC_MAXNAMELEN - 1, "%s", attr_val_p->memfd_name);
+			attr_val_name[RSBAC_MAXNAMELEN - 1] = 0;
+			break;
 		default:
 			snprintf(attr_val_name, RSBAC_MAXNAMELEN - 1, "%u",
 				 attr_val_p->u_dummy);
@@ -1668,6 +1674,9 @@ char *get_target_name(char *target_type_name,
 			break;
 		case I_anonunix:
 			strcpy(target_id_name, "AnonUnix-ID ");
+			break;
+		case I_memfd:
+			strcpy(target_id_name, "MemFD-ID ");
 			break;
 		default:
 			strcpy(target_id_name, "ID ");
