@@ -285,6 +285,7 @@ int vfs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 	struct inode *inode = file_inode(file);
 	long ret;
 #ifdef CONFIG_RSBAC_RW
+	enum  rsbac_target_t rsbac_target;
 	union rsbac_target_id_t rsbac_target_id;
 	union rsbac_attribute_value_t rsbac_attribute_value;
 #endif
@@ -358,13 +359,20 @@ int vfs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 
 #ifdef CONFIG_RSBAC_RW
 	rsbac_pr_debug(aef, "sys_fallocate(): calling ADF\n");
-	rsbac_target_id.file.device = inode->i_sb->s_dev;
-	rsbac_target_id.file.inode = inode->i_ino;
-	rsbac_target_id.file.dentry_p = file->f_path.dentry;
+	if (inode->i_rsbac_memfd) {
+		rsbac_target = T_IPC;
+		rsbac_target_id.ipc.type = I_memfd;
+		rsbac_target_id.ipc.id.id_nr = inode->i_ino;
+	} else {
+		rsbac_target = T_FILE;
+		rsbac_target_id.file.device = inode->i_sb->s_dev;
+		rsbac_target_id.file.inode = inode->i_ino;
+		rsbac_target_id.file.dentry_p = file->f_path.dentry;
+	}
 	rsbac_attribute_value.dummy = 0;
 	if (!rsbac_adf_request(R_WRITE,
 			task_pid(current),
-			T_FILE,
+			rsbac_target,
 			rsbac_target_id,
 			A_none,
 			rsbac_attribute_value))
