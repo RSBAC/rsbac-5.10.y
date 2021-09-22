@@ -1,9 +1,9 @@
 /************************************ */
 /* Rule Set Based Access Control      */
-/* Author and (c) 1999-2010: Amon Ott */
+/* Author and (c) 1999-2021: Amon Ott */
 /* Groups of ADF request for          */
 /* administration                     */
-/* Last modified: 08/Apr/2010         */
+/* Last modified: 22/Sep/2021         */
 /************************************ */
 
 #ifndef __RSBAC_REQUEST_GROUPS_H
@@ -187,6 +187,7 @@
   ((rsbac_request_vector_t) 1 << R_READ_ATTRIBUTE) | \
   ((rsbac_request_vector_t) 1 << R_READ_OPEN) | \
   ((rsbac_request_vector_t) 1 << R_READ_WRITE_OPEN) | \
+  ((rsbac_request_vector_t) 1 << R_RENAME) | \
   ((rsbac_request_vector_t) 1 << R_WRITE) | \
   ((rsbac_request_vector_t) 1 << R_WRITE_OPEN) | \
   ((rsbac_request_vector_t) 1 << R_NET_SHUTDOWN) | \
