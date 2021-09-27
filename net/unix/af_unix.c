@@ -878,7 +878,7 @@ static int unix_release(struct socket *sock)
 	   ) {
 		rsbac_target_id.ipc.type = I_anonunix;
 		rsbac_target_id.ipc.id.id_nr = sock->file->f_path.dentry->d_inode->i_ino;
-		rsbac_remove_target(T_IPC, rsbac_target_id);
+		rsbac_remove_target(T_IPC, &rsbac_target_id);
 	}
 #endif
 

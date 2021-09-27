@@ -1,9 +1,9 @@
 /******************************* */
 /* Rule Set Based Access Control */
-/* Author and (c) 1999-2020:     */
+/* Author and (c) 1999-2021:     */
 /*   Amon Ott <ao@rsbac.org>     */
 /* debug definitions             */
-/* Last modified: 22/Apr/2020    */
+/* Last modified: 27/Sep/2021    */
 /******************************* */
 
 #ifndef __RSBAC_DEBUG_H
@@ -37,6 +37,7 @@ extern int rsbac_debug_no_write;
 #ifdef CONFIG_RSBAC_DEBUG
 extern int rsbac_debug_ds;
 extern int rsbac_debug_write;
+extern int rsbac_debug_memfd;
 extern int rsbac_debug_stack;
 extern int rsbac_debug_lists;
 extern int rsbac_debug_aef;
