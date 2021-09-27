@@ -350,7 +350,7 @@ static void shm_destroy(struct ipc_namespace *ns, struct shmid_kernel *shp)
 	rsbac_pr_debug(aef, "calling ACI remove_target()\n");
 	rsbac_target_id.ipc.type   = I_shm;
 	rsbac_target_id.ipc.id.id_nr  = shp->shm_perm.id;
-	rsbac_remove_target(T_IPC, rsbac_target_id);
+	rsbac_remove_target(T_IPC, &rsbac_target_id);
 #endif
 
 	ipc_rcu_putref(&shp->shm_perm, shm_rcu_free);

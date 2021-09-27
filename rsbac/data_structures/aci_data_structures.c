@@ -5,7 +5,7 @@
 /* (some smaller parts copied from fs/namei.c        */
 /*  and others)                                      */
 /*                                                   */
-/* Last modified: 01/Jun/2021                        */
+/* Last modified: 27/Sep/2021                        */
 /*************************************************** */
 
 #include <linux/types.h>
@@ -12858,7 +12858,7 @@ int rsbac_ta_set_attr(rsbac_list_ta_number_t ta_number,
 
 int rsbac_ta_remove_target(rsbac_list_ta_number_t ta_number,
 			   enum rsbac_target_t target,
-			   union rsbac_target_id_t tid)
+			   union rsbac_target_id_t * tid_p)
 {
 	int error = 0;
 	struct rsbac_device_list_item_t *device_p;
@@ -12882,41 +12882,41 @@ int rsbac_ta_remove_target(rsbac_list_ta_number_t ta_number,
 	case T_FIFO:
 	case T_SYMLINK:
 	case T_UNIXSOCK:
-		inode_nr = tid.file.inode;
+		inode_nr = tid_p->file.inode;
 		/* rsbac_pr_debug(ds, "Removing file/dir/fifo/symlink ACI\n"); */
 #if defined(CONFIG_RSBAC_MAC)
 		/* file and dir items can also have mac_f_trusets -> remove first */
 		if ((target == T_FILE)
 		    || (target == T_DIR)
 		    )
-			error = rsbac_mac_remove_f_trusets(tid.file);
+			error = rsbac_mac_remove_f_trusets(tid_p->file);
 #endif
 #if defined(CONFIG_RSBAC_AUTH)
 		/* file and dir items can also have auth_f_capsets -> remove first */
 		if ((target == T_FILE)
 		    || (target == T_DIR)
 		    )
-			error = rsbac_auth_remove_f_capsets(tid.file);
+			error = rsbac_auth_remove_f_capsets(tid_p->file);
 #endif
 #if defined(CONFIG_RSBAC_ACL)
 		/* items can also have an acl_fd_item -> remove first */
-		error = rsbac_acl_remove_acl(ta_number, target, tid);
+		error = rsbac_acl_remove_acl(ta_number, target, tid_p);
 #endif
-		major = RSBAC_MAJOR(tid.file.device);
-		minor = RSBAC_MINOR(tid.file.device);
+		major = RSBAC_MAJOR(tid_p->file.device);
+		minor = RSBAC_MINOR(tid_p->file.device);
 		hash = device_hash(minor);
 		srcu_idx = srcu_read_lock(&device_list_srcu[hash]);
 		device_p = lookup_device(major, minor, hash);
 		if (!device_p) {
 			srcu_read_unlock(&device_list_srcu[hash], srcu_idx);
-			if (!major || (tid.file.dentry_p && tid.file.dentry_p->d_sb && !rsbac_type_writable(tid.file.dentry_p->d_sb) ) ) {
-				rsbac_printk(KERN_WARNING "rsbac_remove_target(): unknown device %02u:%02u, auto mounting!\n",
+			if (!major || (tid_p->file.dentry_p && tid_p->file.dentry_p->d_sb && !rsbac_type_writable(tid_p->file.dentry_p->d_sb) ) ) {
+				rsbac_printk(KERN_WARNING "rsbac_ta_remove_target(): unknown device %02u:%02u, auto mounting!\n",
 					     major, minor);
 				error = rsbac_automount(major, minor);
 				if (error)
 					return error;
 			} else {
-				rsbac_printk(KERN_WARNING "rsbac_remove_target(): unknown device %02u:%02u, cannot auto mount!\n",
+				rsbac_printk(KERN_WARNING "rsbac_ta_remove_target(): unknown device %02u:%02u, cannot auto mount!\n",
 					     major, minor);
 				return -RSBAC_EINVALIDDEV;
 			}
@@ -12924,58 +12924,58 @@ int rsbac_ta_remove_target(rsbac_list_ta_number_t ta_number,
 			device_p = lookup_device(major, minor, hash);
 			if (!device_p) {
 				srcu_read_unlock(&device_list_srcu[hash], srcu_idx);
-				rsbac_printk(KERN_WARNING "rsbac_remove_target(): unknown device %02u:%02u!\n",
+				rsbac_printk(KERN_WARNING "rsbac_ta_remove_target(): unknown device %02u:%02u!\n",
 					     major, minor);
 				return -RSBAC_EINVALIDDEV;
 			}
 		}
 		rsbac_ta_list_remove(ta_number,
 				     device_p->handles.gen,
-				     device_p->persist ? (void *)&inode_nr : &tid.file.inode);
+				     device_p->persist ? (void *)&inode_nr : &tid_p->file.inode);
 #if defined(CONFIG_RSBAC_MAC)
 		rsbac_ta_list_remove(ta_number,
 				     device_p->handles.mac,
-				     device_p->persist ? (void *)&inode_nr : &tid.file.inode);
+				     device_p->persist ? (void *)&inode_nr : &tid_p->file.inode);
 #endif
 #if defined(CONFIG_RSBAC_FF)
 		rsbac_ta_list_remove(ta_number,
 				     device_p->handles.ff,
-				     device_p->persist ? (void *)&inode_nr : &tid.file.inode);
+				     device_p->persist ? (void *)&inode_nr : &tid_p->file.inode);
 #endif
 #if defined(CONFIG_RSBAC_RC)
 		rsbac_ta_list_remove(ta_number,
 				     device_p->handles.rc,
-				     device_p->persist ? (void *)&inode_nr : &tid.file.inode);
+				     device_p->persist ? (void *)&inode_nr : &tid_p->file.inode);
 #endif
 #if defined(CONFIG_RSBAC_AUTH)
 		rsbac_ta_list_remove(ta_number,
 				     device_p->handles.auth,
-				     device_p->persist ? (void *)&inode_nr : &tid.file.inode);
+				     device_p->persist ? (void *)&inode_nr : &tid_p->file.inode);
 #endif
 #if defined(CONFIG_RSBAC_CAP)
 		rsbac_ta_list_remove(ta_number,
 				     device_p->handles.cap,
-				     device_p->persist ? (void *)&inode_nr : &tid.file.inode);
+				     device_p->persist ? (void *)&inode_nr : &tid_p->file.inode);
 #endif
 #if defined(CONFIG_RSBAC_RES)
 		rsbac_ta_list_lol_remove(ta_number,
 				     device_p->handles.res_min,
-				     device_p->persist ? (void *)&inode_nr : &tid.file.inode);
+				     device_p->persist ? (void *)&inode_nr : &tid_p->file.inode);
 		rsbac_ta_list_lol_remove(ta_number,
 				     device_p->handles.res_max,
-				     device_p->persist ? (void *)&inode_nr : &tid.file.inode);
+				     device_p->persist ? (void *)&inode_nr : &tid_p->file.inode);
 #endif
 #if defined(CONFIG_RSBAC_UDF)
 		rsbac_ta_list_remove(ta_number,
 				     device_p->handles.udf,
-				     device_p->persist ? (void *)&inode_nr : &tid.file.inode);
+				     device_p->persist ? (void *)&inode_nr : &tid_p->file.inode);
 #if defined(CONFIG_RSBAC_UDF_CACHE)
 		rsbac_ta_list_remove(ta_number,
 				     device_p->handles.udfc,
 #ifdef CONFIG_RSBAC_UDF_PERSIST
-				     device_p->persist ? (void *)&inode_nr : &tid.file.inode);
+				     device_p->persist ? (void *)&inode_nr : &tid_p->file.inode);
 #else
-				     &tid.file.inode);
+				     &tid_p->file.inode);
 #endif
 #endif
 #endif
@@ -12984,53 +12984,53 @@ int rsbac_ta_remove_target(rsbac_list_ta_number_t ta_number,
 		srcu_read_unlock(&device_list_srcu[hash], srcu_idx);
 #ifdef CONFIG_RSBAC_FD_CACHE
 		rsbac_pr_debug(fdcache, "removed FD item device %02u:%02u inode %lu, invalidate cache item\n",
-				major, minor, tid.file.inode);
-		rsbac_fd_cache_invalidate(&tid.file);
+				major, minor, tid_p->file.inode);
+		rsbac_fd_cache_invalidate(&tid_p->file);
 #endif
 		break;
 
 	case T_DEV:
 		{
-			switch (tid.dev.type) {
+			switch (tid_p->dev.type) {
 				case D_block:
 				case D_char:
 					rsbac_ta_list_remove(ta_number,
 							dev_handles.gen,
-							&tid.dev);
+							&tid_p->dev);
 #if defined(CONFIG_RSBAC_MAC)
 					rsbac_ta_list_remove(ta_number,
 							dev_handles.mac,
-							&tid.dev);
+							&tid_p->dev);
 #endif
 #if defined(CONFIG_RSBAC_RC)
 					rsbac_ta_list_remove(ta_number,
 							dev_handles.rc,
-							&tid.dev);
+							&tid_p->dev);
 #endif
 					break;
 				case D_block_major:
 				case D_char_major:
 					{
-						enum rsbac_dev_type_t orig_devtype=tid.dev.type;
+						enum rsbac_dev_type_t orig_devtype=tid_p->dev.type;
 
-						if (tid.dev.type==D_block_major)    
-							tid.dev.type=D_block;
+						if (tid_p->dev.type==D_block_major)
+							tid_p->dev.type=D_block;
 						else
-							tid.dev.type=D_char;
+							tid_p->dev.type=D_char;
 						rsbac_ta_list_remove(ta_number,
 								dev_major_handles.gen,
-								&tid.dev);
+								&tid_p->dev);
 #if defined(CONFIG_RSBAC_MAC)
 						rsbac_ta_list_remove(ta_number,
 								dev_major_handles.mac,
-								&tid.dev);
+								&tid_p->dev);
 #endif
 #if defined(CONFIG_RSBAC_RC)
 						rsbac_ta_list_remove(ta_number,
 								dev_major_handles.rc,
-								&tid.dev);
+								&tid_p->dev);
 #endif
-						tid.dev.type=orig_devtype;
+						tid_p->dev.type=orig_devtype;
 						break;
 					}
 				default:
@@ -13042,54 +13042,54 @@ int rsbac_ta_remove_target(rsbac_list_ta_number_t ta_number,
 	case T_IPC:
 		/* rsbac_pr_debug(ds, "Removing ipc ACI\n"); */
 #if defined(CONFIG_RSBAC_MAC)
-		rsbac_ta_list_remove(ta_number, ipc_handles.mac, &tid.ipc);
+		rsbac_ta_list_remove(ta_number, ipc_handles.mac, &tid_p->ipc);
 #endif
 #if defined(CONFIG_RSBAC_RC)
-		rsbac_ta_list_remove(ta_number, ipc_handles.rc, &tid.ipc);
+		rsbac_ta_list_remove(ta_number, ipc_handles.rc, &tid_p->ipc);
 #endif
 #if defined(CONFIG_RSBAC_JAIL)
 		rsbac_ta_list_remove(ta_number,
-				     ipc_handles.jail, &tid.ipc);
+				     ipc_handles.jail, &tid_p->ipc);
 #endif
 		break;
 
 	case T_USER:
 		/* rsbac_pr_debug(ds, "Removing user ACI"); */
 		rsbac_ta_list_remove(ta_number,
-				     user_handles.gen, &tid.user);
+				     user_handles.gen, &tid_p->user);
 #if defined(CONFIG_RSBAC_MAC)
 		rsbac_ta_list_remove(ta_number,
-				     user_handles.mac, &tid.user);
+				     user_handles.mac, &tid_p->user);
 #endif
 #if defined(CONFIG_RSBAC_FF)
 		rsbac_ta_list_remove(ta_number,
-				     user_handles.ff, &tid.user);
+				     user_handles.ff, &tid_p->user);
 #endif
 #if defined(CONFIG_RSBAC_RC)
 		rsbac_ta_list_remove(ta_number,
-				     user_handles.rc, &tid.user);
+				     user_handles.rc, &tid_p->user);
 #endif
 #if defined(CONFIG_RSBAC_AUTH)
 		rsbac_ta_list_remove(ta_number,
-				     user_handles.auth, &tid.user);
+				     user_handles.auth, &tid_p->user);
 #endif
 #if defined(CONFIG_RSBAC_CAP)
 		rsbac_ta_list_remove(ta_number,
-				     user_handles.cap, &tid.user);
+				     user_handles.cap, &tid_p->user);
 #endif
 #if defined(CONFIG_RSBAC_JAIL)
 		rsbac_ta_list_remove(ta_number,
-				     user_handles.jail, &tid.user);
+				     user_handles.jail, &tid_p->user);
 #endif
 #if defined(CONFIG_RSBAC_RES)
 		rsbac_ta_list_lol_remove(ta_number,
-				     user_handles.res_min, &tid.user);
+				     user_handles.res_min, &tid_p->user);
 		rsbac_ta_list_lol_remove(ta_number,
-				     user_handles.res_max, &tid.user);
+				     user_handles.res_max, &tid_p->user);
 #endif
 #if defined(CONFIG_RSBAC_UDF)
 		rsbac_ta_list_remove(ta_number,
-				     user_handles.udf, &tid.user);
+				     user_handles.udf, &tid_p->user);
 #endif
 		break;
 
@@ -13099,41 +13099,41 @@ int rsbac_ta_remove_target(rsbac_list_ta_number_t ta_number,
 */
 #if defined(CONFIG_RSBAC_ACL)
 		/* process items can also have an acl_p_item -> remove first */
-		error = rsbac_acl_remove_acl(ta_number, target, tid);
+		error = rsbac_acl_remove_acl(ta_number, target, tid_p);
 #endif
 		rsbac_ta_list_remove(ta_number,
 				     process_handles.gen,
-				     &tid.process);
+				     &tid_p->process);
 #if defined(CONFIG_RSBAC_MAC)
 		/* process items can also have mac_p_trusets -> remove first */
-		error = rsbac_mac_remove_p_trusets(tid.process);
+		error = rsbac_mac_remove_p_trusets(tid_p->process);
 		rsbac_ta_list_remove(ta_number,
 				     process_handles.mac,
-				     &tid.process);
+				     &tid_p->process);
 #endif
 #if defined(CONFIG_RSBAC_RC)
 		rsbac_ta_list_remove(ta_number,
 				     process_handles.rc,
-				     &tid.process);
+				     &tid_p->process);
 #endif
 #if defined(CONFIG_RSBAC_AUTH)
 		/* process items can also have auth_p_capsets -> remove first */
-		error = rsbac_auth_remove_p_capsets(tid.process);
+		error = rsbac_auth_remove_p_capsets(tid_p->process);
 		rsbac_ta_list_remove(ta_number,
-				     process_handles.auth, &tid.process);
+				     process_handles.auth, &tid_p->process);
 #endif
 #if defined(CONFIG_RSBAC_CAP)
 		rsbac_ta_list_remove(ta_number,
-				     process_handles.cap, &tid.process);
+				     process_handles.cap, &tid_p->process);
 #endif
 #if defined(CONFIG_RSBAC_JAIL)
 		rsbac_ta_list_remove(ta_number,
 				     process_handles.jail,
-				     &tid.process);
+				     &tid_p->process);
 #endif
 #if defined(CONFIG_RSBAC_UDF)
 		rsbac_ta_list_remove(ta_number,
-				     process_handles.udf, &tid.process);
+				     process_handles.udf, &tid_p->process);
 #endif
 		break;
 
@@ -13142,7 +13142,7 @@ int rsbac_ta_remove_target(rsbac_list_ta_number_t ta_number,
 		/* rsbac_pr_debug(ds, "Removing group ACI\n"); */
 #if defined(CONFIG_RSBAC_RC_UM_PROT)
 		rsbac_ta_list_remove(ta_number,
-				     group_handles.rc, &tid.group);
+				     group_handles.rc, &tid_p->group);
 #endif
 		break;
 #endif				/* CONFIG_RSBAC_UM */
@@ -13151,11 +13151,11 @@ int rsbac_ta_remove_target(rsbac_list_ta_number_t ta_number,
 	case T_NETDEV:
 #if defined(CONFIG_RSBAC_IND_NETDEV_LOG)
 		rsbac_ta_list_remove(ta_number,
-				     netdev_handles.gen, &tid.netdev);
+				     netdev_handles.gen, &tid_p->netdev);
 #endif
 #if defined(CONFIG_RSBAC_RC)
 		rsbac_ta_list_remove(ta_number,
-				     netdev_handles.rc, &tid.netdev);
+				     netdev_handles.rc, &tid_p->netdev);
 #endif
 		break;
 #endif
@@ -13167,19 +13167,19 @@ int rsbac_ta_remove_target(rsbac_list_ta_number_t ta_number,
 */
 #if defined(CONFIG_RSBAC_IND_NETOBJ_LOG)
 		rsbac_ta_list_remove(ta_number,
-				     nettemp_handles.gen, &tid.nettemp);
+				     nettemp_handles.gen, &tid_p->nettemp);
 #endif
 #if defined(CONFIG_RSBAC_MAC)
 		rsbac_ta_list_remove(ta_number,
-				     nettemp_handles.mac, &tid.nettemp);
+				     nettemp_handles.mac, &tid_p->nettemp);
 #endif
 #if defined(CONFIG_RSBAC_RC)
 		rsbac_ta_list_remove(ta_number,
-				     nettemp_handles.rc, &tid.nettemp);
+				     nettemp_handles.rc, &tid_p->nettemp);
 #endif
 #if defined(CONFIG_RSBAC_ACL_NET_OBJ_PROT)
-		rsbac_acl_remove_acl(ta_number, T_NETTEMP_NT, tid);
-		rsbac_acl_remove_acl(ta_number, T_NETTEMP, tid);
+		rsbac_acl_remove_acl(ta_number, T_NETTEMP_NT, tid_p);
+		rsbac_acl_remove_acl(ta_number, T_NETTEMP, tid_p);
 #endif
 		break;
 
@@ -13190,18 +13190,18 @@ int rsbac_ta_remove_target(rsbac_list_ta_number_t ta_number,
 #if defined(CONFIG_RSBAC_MAC)
 		rsbac_ta_list_remove(ta_number,
 				     lnetobj_handles.mac,
-				     &tid.netobj.sock_p);
+				     &tid_p->netobj.sock_p);
 		rsbac_ta_list_remove(ta_number,
 				     rnetobj_handles.mac,
-				     &tid.netobj.sock_p);
+				     &tid_p->netobj.sock_p);
 #endif
 #if defined(CONFIG_RSBAC_RC_IND_NET_OBJ)
 		rsbac_ta_list_remove(ta_number,
 				     lnetobj_handles.rc,
-				     &tid.netobj.sock_p);
+				     &tid_p->netobj.sock_p);
 		rsbac_ta_list_remove(ta_number,
 				     rnetobj_handles.rc,
-				     &tid.netobj.sock_p);
+				     &tid_p->netobj.sock_p);
 #endif
 		break;
 
@@ -14041,7 +14041,7 @@ void rsbac_net_obj_cleanup(rsbac_net_obj_id_t netobj)
 	union rsbac_target_id_t tid;
 
 	tid.netobj.sock_p = netobj;
-	rsbac_remove_target(T_NETOBJ, tid);
+	rsbac_remove_target(T_NETOBJ, &tid);
 }
 
 int rsbac_ta_net_template_exists(rsbac_list_ta_number_t ta_number,

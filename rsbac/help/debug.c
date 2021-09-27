@@ -1,12 +1,12 @@
 /******************************************* */
 /* Rule Set Based Access Control             */
 /*                                           */
-/* Author and (c) 1999-2020:                 */
+/* Author and (c) 1999-2021:                 */
 /*   Amon Ott <ao@rsbac.org>                 */
 /*                                           */
 /* Debug and logging functions for all parts */
 /*                                           */
-/* Last modified: 28/Dec/2020                */
+/* Last modified: 27/Sep/2021                */
 /******************************************* */
  
 #include <linux/uaccess.h>
@@ -71,6 +71,9 @@ int  rsbac_debug_ds = 0;
 
 /* Boolean debug switch for writing of data structures */
 int  rsbac_debug_write = 0;
+
+/* Boolean debug switch for IPC memfd */
+int  rsbac_debug_memfd = 0;
 
 /* Boolean debug switch for AEF */
 EXPORT_SYMBOL(rsbac_debug_aef);
@@ -1082,6 +1085,14 @@ __setup("rsbac_no_defaults", no_defaults_setup);
       return 1;
     }
   __setup("rsbac_debug_write", debug_write_setup);
+    /* RSBAC: debug for memfd? */
+//    module_param(rsbac_debug_memfd, bool, S_IRUGO);
+  static int R_INIT debug_memfd_setup(char *line)
+    {
+      rsbac_debug_memfd = 1;
+      return 1;
+    }
+  __setup("rsbac_debug_memfd", debug_memfd_setup);
     /* RSBAC: debug for AEF? */
 //    module_param(rsbac_debug_aef, bool, S_IRUGO);
   static int R_INIT debug_aef_setup(char *line)
@@ -1839,6 +1850,8 @@ debug_proc_show(struct seq_file *m, void *v)
 #ifdef CONFIG_RSBAC_DEBUG
   seq_printf(m, "rsbac_debug_write is %i\n",
                  rsbac_debug_write);
+  seq_printf(m, "rsbac_debug_memfd is %i\n",
+                 rsbac_debug_memfd);
   seq_printf(m, "rsbac_debug_stack is %i\n",
                  rsbac_debug_stack);
   seq_printf(m, "rsbac_debug_lists is %i\n",
@@ -3928,7 +3941,7 @@ static ssize_t debug_proc_write(struct file * file, const char __user * buf, siz
      * Usage: echo "debug write #N" > /proc/rsbac_info/debug
      *   to set rsbac_debug_write to given value
      */
-    if(!strncmp("write", k_buf + 6, 5)) 
+    if(!strncmp("write", k_buf + 6, 5))
       {
 	p += 6;
 
@@ -3943,6 +3956,34 @@ static ssize_t debug_proc_write(struct file * file, const char __user * buf, siz
                    "debug_proc_write(): setting rsbac_debug_write to %u\n",
                    debug_level);
             rsbac_debug_write = debug_level;
+            err = count;
+            goto out;
+          }
+        else
+          {
+            goto out_inv;
+          }
+      }
+
+    /*
+     * Usage: echo "debug memfd #N" > /proc/rsbac_info/debug
+     *   to set rsbac_debug_memfd to given value
+     */
+    if(!strncmp("memfd", k_buf + 6, 5))
+      {
+	p += 6;
+
+        if( *p == '\0' )
+            goto out;
+
+        debug_level = simple_strtoul(p, NULL, 0);
+        /* only accept 0 or 1 */
+        if(!debug_level || (debug_level == 1))
+          {
+            rsbac_printk(KERN_INFO
+                   "debug_proc_memfd(): setting rsbac_debug_memfd to %u\n",
+                   debug_level);
+            rsbac_debug_memfd = debug_level;
             err = count;
             goto out;
           }
@@ -4691,6 +4732,8 @@ inline void __init rsbac_init_debug(void)
       rsbac_printk(KERN_DEBUG "rsbac_debug_ds is set\n");
     if(rsbac_debug_write)
       rsbac_printk(KERN_DEBUG "rsbac_debug_write is set\n");
+    if(rsbac_debug_memfd)
+      rsbac_printk(KERN_DEBUG "rsbac_debug_memfd is set\n");
     if(rsbac_debug_no_write)
       rsbac_printk(KERN_DEBUG "rsbac_debug_no_write is set\n");
     if(rsbac_debug_stack)
