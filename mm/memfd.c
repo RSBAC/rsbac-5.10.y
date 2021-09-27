@@ -365,7 +365,7 @@ SYSCALL_DEFINE2(memfd_create,
 	rsbac_target_id.ipc.type = I_memfd;
 	rsbac_target_id.ipc.id.id_nr = file->f_inode->i_ino;
 	rsbac_new_target_id.dummy = 0;
-	rsbac_pr_debug(memfd, "calling rsbac_adf_set_attr() for memfd %u\n", rsbac_target_id.ipc.id.id_nr);
+	rsbac_pr_debug(memfd, "rsbac_adf_set_attr() for memfd %u\n", rsbac_target_id.ipc.id.id_nr);
 	if (unlikely(rsbac_adf_set_attr(R_CREATE,
 				task_pid(current),
 				T_IPC,
