@@ -794,7 +794,7 @@ static void put_pipe_info(struct inode *inode, struct pipe_inode_info *pipe)
 		rsbac_pr_debug(aef, "calling ACI remove_target()\n");
 		rsbac_target_id.ipc.type = I_anonpipe;
 		rsbac_target_id.ipc.id.id_nr  = inode->i_ino;
-		rsbac_remove_target(T_IPC, rsbac_target_id);
+		rsbac_remove_target(T_IPC, &rsbac_target_id);
 #endif
 
 		free_pipe_info(pipe);

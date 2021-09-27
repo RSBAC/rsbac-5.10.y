@@ -1,11 +1,11 @@
 /******************************* */
 /* Rule Set Based Access Control */
-/* Author and (c) 1999-2020:     */
+/* Author and (c) 1999-2021:     */
 /*   Amon Ott <ao@rsbac.org>     */
 /* API: Data structures          */
 /* and functions for Access      */
 /* Control Information           */
-/* Last modified: 27/Mar/2020    */
+/* Last modified: 27/Sep/2021    */
 /******************************* */
 
 #ifndef __RSBAC_ACI_H
@@ -148,10 +148,10 @@ int rsbac_ta_set_attr(
 int rsbac_ta_remove_target(
   rsbac_list_ta_number_t ta_number,
   enum rsbac_target_t target,
-  union rsbac_target_id_t tid);
+  union rsbac_target_id_t * tid_p);
 
-#define rsbac_remove_target(target, tid) \
-  rsbac_ta_remove_target(0, target, tid)
+#define rsbac_remove_target(target, tid_p) \
+  rsbac_ta_remove_target(0, target, tid_p)
 
 int rsbac_ta_list_all_dev(rsbac_list_ta_number_t ta_number,
                           struct rsbac_dev_desc_t ** id_pp);
