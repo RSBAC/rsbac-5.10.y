@@ -78,7 +78,7 @@ int rsbac_acl_remove_acl_entry(rsbac_list_ta_number_t ta_number,
 
 int rsbac_acl_remove_acl(rsbac_list_ta_number_t ta_number,
 			 enum rsbac_target_t target,
-			 union rsbac_target_id_t tid);
+			 union rsbac_target_id_t * tid_p);
 
 /* rsbac_acl_add_to_acl_entry
  * Add given rights to ACL entry for given target and subject. If entry does
