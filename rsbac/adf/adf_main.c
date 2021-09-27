@@ -3,9 +3,9 @@
 /* Implementation of the Access Control Decision     */
 /* Facility (ADF) - Main file main.c                 */
 /*                                                   */
-/* Author and (c) 1999-2020: Amon Ott <ao@rsbac.org> */
+/* Author and (c) 1999-2021: Amon Ott <ao@rsbac.org> */
 /*                                                   */
-/* Last modified: 29/Dec/2020                        */
+/* Last modified: 27/Sep/2021                        */
 /*************************************************** */
 
 #include <linux/string.h>
@@ -830,7 +830,7 @@ if(ignore_module != SW_REG)
       {
         case R_TERMINATE:
             if (target == T_PROCESS)
-              rsbac_remove_target(T_PROCESS,*tid_p);
+              rsbac_remove_target(T_PROCESS, tid_p);
             break;
 
 #ifdef CONFIG_RSBAC_USER_CHOWN
@@ -1586,7 +1586,7 @@ int  rsbac_adf_set_attr(
 
 /* Ensure that there are no leftover attributes */
         if (request == R_CREATE) {
-          rsbac_remove_target(new_target, new_tid);
+          rsbac_remove_target(new_target, &new_tid);
         }
 
 #if defined(CONFIG_RSBAC_FD_CACHE)
@@ -1668,6 +1668,18 @@ int  rsbac_adf_set_attr(
            ) {
 		rsbac_printk(KERN_WARNING "rsbac_adf_set_attr(): tid for new process in CLONE is NULL!\n");
 		return -RSBAC_EINVALIDTARGET;
+        }
+        break;
+
+      case T_IPC:
+        switch (request) {
+          case R_CREATE:
+            /* remove potential old memfd attributes */
+            if (tid.ipc.type == I_memfd)
+              rsbac_remove_target(target, &tid);
+            break;
+          default:
+            break;
         }
         break;
 
@@ -1841,18 +1853,26 @@ general_work:
                 case T_SYMLINK:
                 case T_UNIXSOCK:
                   /* Only remove file/fifo target on deletion of last link */
-                  if (   (attr == A_nlink)
-                      && (attr_val.nlink > 1)
+                  if (   (attr != A_nlink)
+                      || (attr_val.nlink <= 1)
                      )
-                     break;
-                  /* fall through */
+                    rsbac_remove_target(target, &tid);
+                  break;
                 case T_DIR:
-                  rsbac_remove_target(target,tid);
+                  rsbac_remove_target(target, &tid);
                   break;
                 case T_IPC:
-                  /* shm removal delayed and removed directly, when destroyed */
-                  if(tid.ipc.type != I_shm)
-                    rsbac_remove_target(target,tid);
+                  switch (tid.ipc.type)
+                    {
+                      /* shm removed when destroyed */
+                      case I_shm:
+                        break;
+                      /* memfd removed at iput_final() */
+                      case I_memfd:
+                        break;
+                      default:
+                        rsbac_remove_target(target, &tid);
+                    }
                   break;
                 default:
                   break;
@@ -2064,26 +2084,13 @@ general_work:
 		switch (target) {
 #ifdef CONFIG_RSBAC_NET_OBJ
 		case T_NETOBJ:
-			rsbac_remove_target(target, tid);
+			rsbac_remove_target(target, &tid);
 			break;
 #endif
 		default:
 			break;
 		}
 		break;
-
-#if 0
-	case R_CREATE:
-		switch (target) {
-		case T_IPC:
-			if((tid.ipc.type != I_sem) && !tid.ipc.id.id_nr)
-				error |= -RSBAC_EINVALIDVALUE;
-			break;
-		default:
-			break;
-		}
-		break;
-#endif
 
 #ifdef CONFIG_RSBAC_NET_OBJ
         case R_ACCEPT:
