@@ -4,9 +4,9 @@
 /* Facility (ADF) - ACL module                       */
 /* File: rsbac/adf/acl/syscalls.c                    */
 /*                                                   */
-/* Author and (c) 1999-2016: Amon Ott <ao@rsbac.org> */
+/* Author and (c) 1999-2021: Amon Ott <ao@rsbac.org> */
 /*                                                   */
-/* Last modified: 04/Apr/2016                        */
+/* Last modified: 27/Sep/2021                        */
 /*************************************************** */
 
 #include <linux/string.h>
@@ -556,7 +556,7 @@ int rsbac_acl_sys_remove_acl(
       }
 
     /* OK, check passed. Set ACL. */
-    err = rsbac_acl_remove_acl(ta_number, target, tid);
+    err = rsbac_acl_remove_acl(ta_number, target, &tid);
     if(err)
       {
         char * tmp = rsbac_kmalloc_unlocked(RSBAC_MAXNAMELEN);
