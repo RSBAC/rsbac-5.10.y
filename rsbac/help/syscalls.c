@@ -1,9 +1,9 @@
 /*************************************************** */
 /* Rule Set Based Access Control                     */
 /* Implementation of RSBAC general system calls      */
-/* Author and (C) 1999-2020: Amon Ott <ao@rsbac.org> */
+/* Author and (C) 1999-2021: Amon Ott <ao@rsbac.org> */
 /*                                                   */
-/* Last modified: 22/Apr/2020                        */
+/* Last modified: 27/Sep/2021                        */
 /*************************************************** */
 
 #include <rsbac/types.h>
@@ -986,7 +986,7 @@ int sys_rsbac_remove_target(
         {
           return -EPERM;
         }
-      err = rsbac_ta_remove_target(ta_number, target, k_tid);
+      err = rsbac_ta_remove_target(ta_number, target, &k_tid);
       return err;
     }      /* end of sys_rsbac_remove_target() */
 
@@ -1199,7 +1199,7 @@ int sys_rsbac_remove_target_n(
         }
       else
         {
-          err = rsbac_ta_remove_target(ta_number, target, tid);
+          err = rsbac_ta_remove_target(ta_number, target, &tid);
         }
 
 out_dput:
