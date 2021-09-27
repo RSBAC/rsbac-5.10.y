@@ -1,9 +1,9 @@
 /*************************************************** */
 /* Rule Set Based Access Control                     */
 /* Implementation of ACL data structures             */
-/* Author and (c) 1999-2020: Amon Ott <ao@rsbac.org> */
+/* Author and (c) 1999-2021: Amon Ott <ao@rsbac.org> */
 /*                                                   */
-/* Last modified: 29/Dec/2020                        */
+/* Last modified: 27/Sep/2021                        */
 /*************************************************** */
 
 #include <linux/types.h>
@@ -5059,7 +5059,7 @@ int rsbac_acl_remove_acl_entry(rsbac_list_ta_number_t ta_number,
 
 int rsbac_acl_remove_acl(rsbac_list_ta_number_t ta_number,
 			 enum rsbac_target_t target,
-			 union rsbac_target_id_t tid)
+			 union rsbac_target_id_t * tid_p)
 {
 	int err = 0;
 #ifdef CONFIG_RSBAC_DEBUG
@@ -5084,18 +5084,18 @@ int rsbac_acl_remove_acl(rsbac_list_ta_number_t ta_number,
 	case T_FIFO:
 	case T_SYMLINK:
 	case T_UNIXSOCK:
-	        inode_nr = tid.file.inode;
+	        inode_nr = tid_p->file.inode;
 		rsbac_pr_debug(ds_acl, "Removing file/dir/fifo/symlink ACL for device %02u:%02u, inode %lu\n",
-			       RSBAC_MAJOR(tid.file.device),
-			       RSBAC_MINOR(tid.file.device), tid.file.inode);
+			       RSBAC_MAJOR(tid_p->file.device),
+			       RSBAC_MINOR(tid_p->file.device), tid_p->file.inode);
 		/* default entry? */
-		if (RSBAC_IS_ZERO_DEV(RSBAC_MAJOR(tid.file.device), RSBAC_MINOR(tid.file.device)) && !tid.file.inode
-		    && !tid.file.dentry_p)
+		if (RSBAC_IS_ZERO_DEV(RSBAC_MAJOR(tid_p->file.device), RSBAC_MINOR(tid_p->file.device)) && !tid_p->file.inode
+		    && !tid_p->file.dentry_p)
 			return -RSBAC_EINVALIDTARGET;
 
 		srcu_idx = srcu_read_lock(&device_list_srcu);
 		/* lookup device */
-		device_p = acl_lookup_device(RSBAC_MAJOR(tid.file.device), RSBAC_MINOR(tid.file.device));
+		device_p = acl_lookup_device(RSBAC_MAJOR(tid_p->file.device), RSBAC_MINOR(tid_p->file.device));
 		if (!device_p) {
 			rsbac_printk(KERN_WARNING "rsbac_acl_remove_acl(): Could not lookup device!\n");
 			srcu_read_unlock(&device_list_srcu, srcu_idx);
@@ -5109,24 +5109,24 @@ int rsbac_acl_remove_acl(rsbac_list_ta_number_t ta_number,
 
 	case T_DEV:
 		rsbac_pr_debug(ds_acl, "Removing device ACL for dev %c %02u:%02u\n",
-			       'B' + tid.dev.type, tid.dev.major,
-			       tid.dev.minor);
+			       'B' + tid_p->dev.type, tid_p->dev.major,
+			       tid_p->dev.minor);
 		/* default entry? */
-		if (RSBAC_IS_ZERO_DEV_DESC(tid.dev))
+		if (RSBAC_IS_ZERO_DEV_DESC(tid_p->dev))
 			return -RSBAC_EINVALIDTARGET;
-		switch (tid.dev.type) {
+		switch (tid_p->dev.type) {
 		case D_char:
 		case D_block:
 			return rsbac_ta_list_lol_remove(ta_number,
 							dev_handle,
-							&tid.dev);
+							&tid_p->dev);
 
 		case D_char_major:
 		case D_block_major:
-			tid.dev.type -= (D_block_major - D_block);
+			tid_p->dev.type -= (D_block_major - D_block);
 			return rsbac_ta_list_lol_remove(ta_number,
 							dev_major_handle,
-							&tid.dev);
+							&tid_p->dev);
 
 		default:
 			return -RSBAC_EINVALIDTARGET;
@@ -5134,83 +5134,83 @@ int rsbac_acl_remove_acl(rsbac_list_ta_number_t ta_number,
 
 	case T_SCD:
 		rsbac_pr_debug(ds_acl, "Removing SCD ACL for %s\n",
-			       get_acl_scd_type_name(tmp, tid.scd));
+			       get_acl_scd_type_name(tmp, tid_p->scd));
 		/* default entry? */
-		if (tid.scd == AST_none)
+		if (tid_p->scd == AST_none)
 			return -RSBAC_EINVALIDTARGET;
 		else
 			return rsbac_ta_list_lol_remove(ta_number,
 							scd_handle,
-							&tid.scd);
+							&tid_p->scd);
 
 	case T_USER:
 		rsbac_pr_debug(ds_acl, "Removing user ACL for user %u\n",
-			       tid.user);
+			       tid_p->user);
 		/* default entry? */
-		if (tid.user == RSBAC_NO_USER)
+		if (tid_p->user == RSBAC_NO_USER)
 			return -RSBAC_EINVALIDTARGET;
 		else
 			return rsbac_ta_list_lol_remove(ta_number,
 							u_handle,
-							&tid.user);
+							&tid_p->user);
 
 #ifdef CONFIG_RSBAC_ACL_UM_PROT
 	case T_GROUP:
 		rsbac_pr_debug(ds_acl, "Removing Linux group ACL for group %u\n",
-			       tid.group);
+			       tid_p->group);
 		/* default entry? */
-		if (tid.group == RSBAC_NO_GROUP)
+		if (tid_p->group == RSBAC_NO_GROUP)
 			return -RSBAC_EINVALIDTARGET;
 		else
 			return rsbac_ta_list_lol_remove(ta_number,
 							g_handle,
-							&tid.group);
+							&tid_p->group);
 #endif
 
 #ifdef CONFIG_RSBAC_ACL_NET_DEV_PROT
 	case T_NETDEV:
 		rsbac_pr_debug(ds_acl, "Removing network device ACL for netdev %s\n",
-			       tid.netdev);
+			       tid_p->netdev);
 		/* default entry? */
-		if (!tid.netdev[0])
+		if (!tid_p->netdev[0])
 			return -RSBAC_EINVALIDTARGET;
 		else
 			return rsbac_ta_list_lol_remove(ta_number,
 							netdev_handle,
-							&tid.netdev);
+							&tid_p->netdev);
 #endif
 
 #ifdef CONFIG_RSBAC_ACL_NET_OBJ_PROT
 	case T_NETTEMP_NT:
 		rsbac_pr_debug(ds_acl, "Removing network template NT ACL for nettemp_nt %u\n",
-			       tid.nettemp);
+			       tid_p->nettemp);
 		/* default entry? */
-		if (!tid.nettemp)
+		if (!tid_p->nettemp)
 			return -RSBAC_EINVALIDTARGET;
 		else
 			return rsbac_ta_list_lol_remove(ta_number,
 							nettemp_nt_handle,
-							&tid.nettemp);
+							&tid_p->nettemp);
 	case T_NETTEMP:
 		rsbac_pr_debug(ds_acl, "Removing network template ACL for nettemp %u\n",
-			       tid.nettemp);
+			       tid_p->nettemp);
 		/* default entry? */
-		if (!tid.nettemp)
+		if (!tid_p->nettemp)
 			return -RSBAC_EINVALIDTARGET;
 		else
 			return rsbac_ta_list_lol_remove(ta_number,
 							nettemp_handle,
-							&tid.nettemp);
+							&tid_p->nettemp);
 	case T_NETOBJ:
 		rsbac_pr_debug(ds_acl, "Removing network object ACL for netobj %p\n",
-			       tid.netobj.sock_p);
+			       tid_p->netobj.sock_p);
 		/* default entry? */
-		if (!tid.netobj.sock_p)
+		if (!tid_p->netobj.sock_p)
 			return -RSBAC_EINVALIDTARGET;
 		else
 			return rsbac_ta_list_lol_remove(ta_number,
 							netobj_handle,
-							&tid.netobj.
+							&tid_p->netobj.
 							sock_p);
 #endif
 
