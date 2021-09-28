@@ -1706,17 +1706,6 @@ static void iput_final(struct inode *inode)
 
 	WARN_ON(inode->i_state & I_NEW);
 
-#ifdef CONFIG_RSBAC
-	if (inode->i_rsbac_memfd) {
-		union rsbac_target_id_t rsbac_target_id;
-
-		rsbac_pr_debug(memfd, "remove_target() for memfd %u\n", inode->i_ino);
-		rsbac_target_id.ipc.type = I_memfd;
-		rsbac_target_id.ipc.id.id_nr = inode->i_ino;
-		rsbac_remove_target(T_IPC, &rsbac_target_id);
-	}
-#endif
-
 	if (op->drop_inode)
 		drop = op->drop_inode(inode);
 	else
@@ -1747,6 +1736,17 @@ static void iput_final(struct inode *inode)
 	if (!list_empty(&inode->i_lru))
 		inode_lru_list_del(inode);
 	spin_unlock(&inode->i_lock);
+
+#ifdef CONFIG_RSBAC
+	if (inode->i_rsbac_memfd) {
+		union rsbac_target_id_t rsbac_target_id;
+
+		rsbac_pr_debug(memfd, "remove_target() for memfd %u\n", inode->i_ino);
+		rsbac_target_id.ipc.type = I_memfd;
+		rsbac_target_id.ipc.id.id_nr = inode->i_ino;
+		rsbac_remove_target(T_IPC, &rsbac_target_id);
+	}
+#endif
 
 	evict(inode);
 }
