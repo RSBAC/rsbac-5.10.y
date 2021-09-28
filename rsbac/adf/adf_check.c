@@ -6,7 +6,7 @@
 /*                                                   */
 /* Author and (c) 1999-2021: Amon Ott <ao@rsbac.org> */
 /*                                                   */
-/* Last modified: 21/Sep/2021                        */
+/* Last modified: 28/Sep/2021                        */
 /*************************************************** */
 
 #include <linux/string.h>
@@ -937,7 +937,8 @@ int rsbac_adf_set_attr_check(enum rsbac_adf_request_t request,
 		case T_DIR:
 		case T_FIFO:
 		case T_SYMLINK:
-                case T_UNIXSOCK:
+		case T_UNIXSOCK:
+		case T_IPC:
 			return 0;
 			/* all other cases are undefined */
 		default:
