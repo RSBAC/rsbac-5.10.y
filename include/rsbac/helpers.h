@@ -1,8 +1,8 @@
 /************************************* */
 /* Rule Set Based Access Control       */
-/* Author and (c) 1999-2018: Amon Ott  */
+/* Author and (c) 1999-2021: Amon Ott  */
 /* Helper functions for all parts      */
-/* Last modified:  17/Jan/2018         */
+/* Last modified:  04/Oct/2021         */
 /************************************* */
 
 #ifndef __RSBAC_HELPER_H
@@ -12,9 +12,7 @@
 #include <linux/sched.h>
 #include <linux/uaccess.h>
 #include <rsbac/types.h>
-#ifdef __KERNEL__
 #include <rsbac/rkmem.h>
-#endif
 
 char * inttostr(char[], int);
 
@@ -28,73 +26,11 @@ __u32 strtou32cap(char * str, __u32 * i_p);
 
 int rsbac_get_vset_num(char * sourcename, rsbac_um_set_t * vset_p);
 
-#ifndef __KERNEL__
-void locale_init(void);
-
-int rsbac_lib_version(void);
-int rsbac_u32_compare(__u32 * a, __u32 * b);
-int rsbac_u32_void_compare(const void *a, const void *b);
-
-int rsbac_user_compare(const void * a, const void * b);
-int rsbac_group_compare(const void * a, const void * b);
-int rsbac_nettemp_id_compare(const void * a, const void * b);
-
-int rsbac_dev_compare(const void * desc1,
-                      const void * desc2);
-
-char * get_user_name(rsbac_uid_t user, char * name);
-
-char * get_group_name(rsbac_gid_t group, char * name);
-
-int rsbac_get_uid_name(rsbac_uid_t * uid, char * name, char * sourcename);
-
-int rsbac_get_fullname(char * fullname, rsbac_uid_t uid);
-
-static inline int rsbac_get_uid(rsbac_uid_t * uid, char * sourcename)
-  {
-    return rsbac_get_uid_name(uid, NULL, sourcename);
-  }
-
-int rsbac_get_gid_name(rsbac_gid_t * gid, char * name, char * sourcename);
-
-static inline int rsbac_get_gid(rsbac_gid_t * gid, char * sourcename)
-  {
-    return rsbac_get_gid_name(gid, NULL, sourcename);
-  }
-
-/* covert u_long_long to binary string representation for log array */
-char * u64tostrlog(char[], __u64);
-/* and back */
-__u64 strtou64log(char[], __u64 *);
-
-/* convert u_long_long to binary string representation for MAC module */
-/* and back */
-__u64 strtou64mac(char[], __u64 *);
-
-/* covert u_long_long to binary string representation for RC module */
-char * u64tostrrc(char[], __u64);
-/* and back */
-__u64 strtou64rc(char[], __u64 *);
-
-/* covert u_long_long to binary string representation for RC module / rights */
-char * u64tostrrcr(char[], __u64);
-/* and back */
-__u64 strtou64rcr(char[], __u64 *);
-
-/* ACL back */
-__u64 strtou64acl(char[], __u64 *);
-
-char * devdesctostr(char * str, struct rsbac_dev_desc_t dev);
-
-int strtodevdesc(char * str, struct rsbac_dev_desc_t * dev_p);
-#endif
-
 /* covert u_long_long to binary string representation for ACL module */
 char * u64tostracl(char[], __u64);
 
 char * longtostr(char[], long);
 
-#ifdef __KERNEL__
 #include <asm/uaccess.h>
 
 #ifdef CONFIG_RSBAC_UM_VIRTUAL
@@ -153,7 +89,5 @@ void rsbac_ds_set_error_num(const char * function, enum rsbac_attribute_t attr, 
 void rsbac_rc_ds_get_error(const char * function, enum rsbac_rc_item_t item);
 void rsbac_rc_ds_set_error(const char * function, enum rsbac_rc_item_t item);
 #endif
-
-#endif /* KERNEL */
 
 #endif

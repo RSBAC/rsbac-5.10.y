@@ -6,9 +6,6 @@
 /* Last modified: 04/Jan/2019          */
 /************************************* */
 
-#ifndef __KERNEL__
-#include <stdlib.h>
-#endif
 #include <rsbac/types.h>
 #include <rsbac/error.h>
 #include <rsbac/helpers.h>
@@ -17,7 +14,6 @@
 #include <rsbac/cap_getname.h>
 #include <rsbac/adf.h>
 
-#ifdef __KERNEL__
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/fs.h>
@@ -34,14 +30,6 @@
 #ifdef CONFIG_RSBAC_RC
 #include <rsbac/rc_getname.h>
 #endif
-#endif
-#ifndef __KERNEL__
-#include <stdio.h>
-#include <string.h>
-#include <errno.h>
-#include <pwd.h>
-#include <grp.h>
-#endif
 
 int rsbac_get_vset_num(char * sourcename, rsbac_um_set_t * vset_p)
   {
@@ -55,62 +43,13 @@ int rsbac_get_vset_num(char * sourcename, rsbac_um_set_t * vset_p)
       *vset_p = RSBAC_UM_VIRTUAL_KEEP;
       return 0;
     }
-#ifdef __KERNEL__
     *vset_p = simple_strtoul(sourcename, NULL, 0);
-#else
-    *vset_p = strtoul(sourcename, NULL, 0);
-#endif
     if(!*vset_p && strcmp(sourcename,"0"))
       return -RSBAC_EINVALIDVALUE;
     if (*vset_p > RSBAC_UM_VIRTUAL_MAX)
       return -RSBAC_EINVALIDVALUE;
     return 0;
   }
-
-#ifndef __KERNEL__
-int rsbac_u32_compare(__u32 * a, __u32 * b)
-  {
-    if(*a < *b)
-     return -1;
-    if(*a > *b)
-      return 1;
-    return 0;
-  }
-
-int rsbac_user_compare(const void * a, const void * b)
-  {
-    return rsbac_u32_compare((__u32 *) a, (__u32 *) b);
-  }
-
-int rsbac_group_compare(const void * a, const void * b)
-  {
-    return rsbac_u32_compare((__u32 *) a, (__u32 *) b);
-  }
-
-int rsbac_nettemp_id_compare(const void * a, const void * b)
-  {
-    return rsbac_u32_compare((__u32 *) a, (__u32 *) b);
-  }
-
-int rsbac_dev_compare(const void *desc1, const void *desc2)
-{
-	int result;
-
-	result = memcmp(&((struct rsbac_dev_desc_t *)desc1)->type,
-			&((struct rsbac_dev_desc_t *)desc2)->type,
-			sizeof(((struct rsbac_dev_desc_t *)desc1)->type));
-	if (result)
-		return result;
-	result = memcmp(&((struct rsbac_dev_desc_t *)desc1)->major,
-			&((struct rsbac_dev_desc_t *)desc2)->major,
-			sizeof(((struct rsbac_dev_desc_t *)desc1)->major));
-	if (result)
-		return result;
-	return memcmp(&((struct rsbac_dev_desc_t *)desc1)->minor,
-		&((struct rsbac_dev_desc_t *)desc2)->minor,
-		sizeof(((struct rsbac_dev_desc_t *)desc1)->minor));
-}
-#endif
 
 char * inttostr(char * str, int i)
   {
@@ -240,413 +179,6 @@ char * u64tostrmac(char * str, __u64 i)
     str[RSBAC_MAC_NR_CATS] = 0;
     return (str);
   };
-
-#ifndef __KERNEL__
-
-void error_exit(int error)
-  {
-    char tmp1[80];
-
-    if(error<0)
-      {
-        get_error_name(tmp1,error);
-        fprintf(stderr, "Error: %s\n", tmp1);
-        exit(1);
-      }
-  }
-
-void show_error(int error)
-  {
-    char tmp1[80];
-
-    if(error<0)
-      {
-        get_error_name(tmp1,error);
-        fprintf(stderr, "Error: %s\n", tmp1);
-      }
-  }
-
-int rsbac_get_uid_name(rsbac_uid_t * uid, char * name, char * sourcename)
-  {
-    struct passwd * user_info_p;
-    rsbac_uid_t uid_i;
-
-    if(!(user_info_p = getpwnam(sourcename)))
-      {
-        uid_i = strtoul(sourcename,0,10);
-        if(   !uid_i
-           && strcmp("0", sourcename)
-          )
-          {
-            return -RSBAC_EINVALIDVALUE;
-          }
-        if(name)
-          {
-            if((user_info_p = getpwuid(uid_i)))
-              strcpy(name, user_info_p->pw_name);
-            else
-              sprintf(name, "%u", uid_i);
-          }
-      }
-    else
-      {
-        uid_i = user_info_p->pw_uid;
-        if(name)
-          strcpy(name, user_info_p->pw_name);
-      }
-    if(uid)
-      *uid = uid_i;
-    return 0;
-  }
-
-int rsbac_get_fullname(char * fullname, rsbac_uid_t uid)
-  {
-    struct passwd * user_info_p;
-    rsbac_uid_t uid_i;
-
-    if(!fullname)
-      return -RSBAC_EINVALIDPOINTER;
-    if(!(user_info_p = getpwuid(uid)))
-      {
-        sprintf(fullname, "%u", uid);
-      }
-    else
-      {
-        strcpy(fullname, user_info_p->pw_gecos);
-      }
-    return 0;
-  }
-
-char * get_user_name(rsbac_uid_t user, char * name)
-  {
-    struct passwd * user_info_p;
-
-    if((user_info_p = getpwuid(user)))
-      {
-        strcpy(name, user_info_p->pw_name);
-      }
-    else
-      {
-        sprintf(name, "%u", user);
-      }
-    return name;
-  }
-
-char * get_group_name(rsbac_gid_t group, char * name)
-  {
-    struct group * group_info_p;
-
-    if((group_info_p = getgrgid(group)))
-      {
-        strcpy(name, group_info_p->gr_name);
-      }
-    else
-      {
-        sprintf(name, "%u", group);
-      }
-    return name;
-  }
-
-int rsbac_get_gid_name(rsbac_gid_t * gid, char * name, char * sourcename)
-  {
-    struct group * group_info_p;
-    rsbac_gid_t gid_i;
-
-    if(!(group_info_p = getgrnam(sourcename)))
-      {
-        gid_i = strtoul(sourcename,0,10);
-        if(   !gid_i
-           && strcmp("0", sourcename)
-          )
-          {
-            return -RSBAC_EINVALIDVALUE;
-          }
-        if(name)
-          {
-            if((group_info_p = getgrgid(gid_i)))
-              strcpy(name, group_info_p->gr_name);
-            else
-              sprintf(name, "%u", gid_i);
-          }
-      }
-    else
-      {
-        gid_i = group_info_p->gr_gid;
-        if(name)
-          strcpy(name, group_info_p->gr_name);
-      }
-    if(gid)
-      *gid = gid_i;
-    return 0;
-  }
-
-
-char * u64tostrlog(char * str, __u64 i)
-  {
-    int    j = 0;
-    __u64  k;
-
-    if(!str)
-      return(NULL);
-
-    k = 1;
-    for(j = R_NONE - 1;j >= 0;j--)
-      {
-        if (i & k)
-          str[j] = '1';
-        else
-          str[j] = '0';
-        k<<=1;
-      };
-
-    str[R_NONE] = 0;
-    return (str);
-  };
-
-__u64 strtou64log(char * str, __u64 * i_p)
-  {
-    int    j;
-    __u64  k = 1, res=0;
-    
-    if(!str)
-      return(0);
-
-    if (strlen(str) < R_NONE)
-      return(-1);
-    for(j=R_NONE-1;j>=0;j--)
-      {
-        if(str[j] != '0')
-          {
-            res |= k;
-          }
-        k <<= 1;
-      }
-    for(j=R_NONE;j<64;j++)
-      {
-        res |= k;
-        k <<= 1;
-      }
-    *i_p = res;
-    return(res);
-  };
-
-char * u64tostrrc(char * str, __u64 i)
-  {
-    int    j = 0;
-    __u64  k;
-
-    if(!str)
-      return(NULL);
-
-    k = 1;
-    for(j = 63;j >= 0;j--)
-      {
-        if (i & k)
-          str[j] = '1';
-        else
-          str[j] = '0';
-        k<<=1;
-      };
-
-    str[64] = 0;
-    return (str);
-  };
-
-__u64 strtou64rc(char * str, __u64 * i_p)
-  {
-    int    j;
-    __u64  k = 1, res=0;
-    
-    if(!str)
-      return(0);
-
-    if (strlen(str) < 64)
-      return(-1);
-    for(j=63;j>=0;j--)
-      {
-        if(str[j] != '0')
-          {
-            res |= k;
-          }
-        k <<= 1;
-      }
-    *i_p = res;
-    return(res);
-  };
-
-char * u64tostrrcr(char * str, __u64 i)
-  {
-    int    j = 0;
-    __u64  k;
-
-    if(!str)
-      return(NULL);
-
-    k = 1;
-    for(j = RCR_NONE - 1;j >= 0;j--)
-      {
-        if (i & k)
-          str[j] = '1';
-        else
-          str[j] = '0';
-        k<<=1;
-      };
-
-    str[RCR_NONE] = 0;
-    return (str);
-  };
-
-__u64 strtou64rcr(char * str, __u64 * i_p)
-  {
-    int    j;
-    __u64  k = 1, res=0;
-    
-    if(!str)
-      return(0);
-
-    if (strlen(str) < RCR_NONE)
-      return(-1);
-    for(j=RCR_NONE-1;j>=0;j--)
-      {
-        if(str[j] != '0')
-          {
-            res |= k;
-          }
-        k <<= 1;
-      }
-    for(j=RCR_NONE;j<64;j++)
-      {
-        res |= k;
-        k <<= 1;
-      }
-    *i_p = res;
-    return(res);
-  };
-
-__u64 strtou64mac(char * str, __u64 * i_p)
-  {
-    int    j;
-    __u64  k = 1, res=0;
-    
-    if(!str)
-      return(0);
-
-    if (strlen(str) < RSBAC_MAC_NR_CATS)
-      return(-1);
-    for(j=RSBAC_MAC_MAX_CAT;j>=0;j--)
-      {
-        if(str[j] != '0')
-          {
-            res |= k;
-          }
-        k <<= 1;
-      }
-    for(j=RSBAC_MAC_NR_CATS;j<64;j++)
-      {
-        res |= k;
-        k <<= 1;
-      }
-    *i_p = res;
-    return(res);
-  };
-
-__u64 strtou64acl(char * str, __u64 * i_p)
-  {
-    int    j;
-    __u64  k = 1, res=0;
-    
-    if(!str)
-      return(0);
-
-    if (strlen(str) < (ACLR_NONE - 1))
-      return(-1);
-    for(j=ACLR_NONE-1;j>=0;j--)
-      {
-        if(str[j] != '0')
-          {
-            res |= k;
-          }
-        k <<= 1;
-      }
-    for(j=ACLR_NONE-1;j<64;j++)
-      {
-        res |= k;
-        k <<= 1;
-      }
-    *i_p = res;
-    return(res);
-  }
-
-int strtodevdesc(char * str, struct rsbac_dev_desc_t * dev_p)
-  {
-    char * p;
-    char * c;
-
-    if(!str)
-      return -RSBAC_EINVALIDVALUE;
-    if(!strcmp(str, ":DEFAULT:"))
-      {
-        *dev_p = RSBAC_ZERO_DEV_DESC;
-        return 0;
-      }
-    p = str;
-    c = strchr(p,':');
-    switch(*p)
-      {
-        case 'b':
-        case 'B':
-          if(c)
-            dev_p->type = D_block;
-          else
-            dev_p->type = D_block_major;
-          break;
-        case 'c':
-        case 'C':
-          if(c)
-            dev_p->type = D_char;
-          else
-            dev_p->type = D_char_major;
-          break;
-        default:
-          return -RSBAC_EINVALIDTARGET;
-      }
-    p++;
-    dev_p->major = strtoul(p,0,0);
-    if(c)
-      {
-        c++;
-        dev_p->minor = strtoul(c,0,0);
-      }
-    else
-      dev_p->minor = 0;
-    return 0;
-  }
-
-char * devdesctostr(char * str, struct rsbac_dev_desc_t dev)
-  {
-    if(RSBAC_IS_ZERO_DEV_DESC(dev))
-      {
-        sprintf(str, ":DEFAULT:");
-        return str;
-      }
-    switch(dev.type)
-      {
-        case D_block:
-        case D_char:
-          sprintf(str, "%c%u:%u", 'b' + dev.type, dev.major, dev.minor);
-          break;
-        case D_block_major:
-        case D_char_major:
-          sprintf(str, "%c%u",
-                  'b' + dev.type - (D_block_major - D_block),
-                  dev.major);
-          break;
-        default:
-          sprintf(str, "invalid!");
-      }
-    return str;
-  }
-#endif /* ifndef __KERNEL__ */
 
 char * u64tostracl(char * str, __u64 i)
   {
@@ -788,8 +320,6 @@ __u32 strtou32cap(char * str, __u32 * i_p)
     return(res);
   };
 
-
-#ifdef __KERNEL__
 
 #ifdef CONFIG_RSBAC_UM_VIRTUAL
 rsbac_um_set_t rsbac_get_vset(void)
@@ -1164,20 +694,6 @@ int rsbac_handle_rw_req(const struct file *file, struct rsbac_rw_req *rsbac_rw_r
                 rsbac_rw_req_obj->rsbac_target_id.dev.major = RSBAC_MAJOR(file->f_path.dentry->d_inode->i_rdev);
                 rsbac_rw_req_obj->rsbac_target_id.dev.minor = RSBAC_MINOR(file->f_path.dentry->d_inode->i_rdev);
 	}
-/*
-	printk("i_mode %i\n", file->f_path.dentry->d_inode->i_mode);
-	printk("req %i %i\n", rsbac_rw_req_obj->rsbac_request, rsbac_rw_req_obj->rsbac_target);
-	if (S_ISCHR(file->f_path.dentry->d_inode->i_mode))
-		printk("CHR");
-	if (S_ISBLK(file->f_path.dentry->d_inode->i_mode))
-		printk("BLK");
-	if (S_ISSOCK(file->f_path.dentry->d_inode->i_mode))
-		printk("SOCK");
-	if (S_ISREG(file->f_path.dentry->d_inode->i_mode))
-		printk("REG");
-	if (S_ISFIFO(file->f_path.dentry->d_inode->i_mode))
-		printk("FIFO");
-*/
 	if (rsbac_rw_req_obj->rsbac_target != T_NONE)
 		if (!rsbac_adf_request(rsbac_rw_req_obj->rsbac_request,
 					task_pid(current),
@@ -1214,5 +730,3 @@ int rsbac_handle_rw_up(struct rsbac_rw_req *rsbac_rw_req_obj)
 
 	return err;
 }
-#endif
-/* __KERNEL__ */

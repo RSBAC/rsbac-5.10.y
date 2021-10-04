@@ -1,20 +1,18 @@
 /*********************************/
 /* Rule Set Based Access Control */
-/* Author and (c) 1999-2017:     */
+/* Author and (c) 1999-2021:     */
 /*   Amon Ott <ao@rsbac.org>     */
 /* Data structures for Role      */
 /* Compatibility module          */
-/* Last modified: 20/Sep/2017    */
+/* Last modified: 04/Oct/2021    */
 /*********************************/
 
 
 #ifndef __RSBAC_RC_DATA_STRUC_H
 #define __RSBAC_RC_DATA_STRUC_H
 
-#ifdef __KERNEL__		/* only include in kernel code */
 #include <linux/types.h>
 #include <rsbac/types.h>
-#endif				/* __KERNEL__ */
 
 /* First of all we define dirname and filenames for saving the roles to disk. */
 /* The path must be a valid single dir name! Each mounted device gets its    */
@@ -22,7 +20,6 @@
 /* All user access to these files will be denied.                            */
 /* Backups are kept in FILENAMEb.                                            */
 
-#ifdef __KERNEL__
 #define RSBAC_RC_LIST_KEY 77788855
 
 #define RSBAC_RC_NR_ROLE_LIST_HASH_BITS 2
@@ -125,7 +122,6 @@
 #define RSBAC_RC_TYPE_NETDEV_LIST_VERSION 1
 #define RSBAC_RC_TYPE_NETTEMP_LIST_VERSION 1
 #define RSBAC_RC_TYPE_NETOBJ_LIST_VERSION 1
-#endif				/* __KERNEL__ */
 
 /*
  * The following structures provide the role model data structures.
@@ -347,8 +343,5 @@ struct rsbac_rc_type_fd_entry_t {
 /**********************************************/
 /*              Declarations                  */
 /**********************************************/
-
-#ifdef __KERNEL__
-#endif				/* __KERNEL__ */
 
 #endif				/* __RSBAC_RC_DATA_STRUC_H */

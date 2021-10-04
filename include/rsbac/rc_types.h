@@ -1,9 +1,9 @@
 /************************************ */
 /* Rule Set Based Access Control      */
-/* Author and (c) 1999-2020: Amon Ott */
+/* Author and (c) 1999-2021: Amon Ott */
 /* API: Data types for                */
 /*    Role Compatibility Module       */
-/* Last modified: 02/Mar/2020         */
+/* Last modified: 04/Oct/2021         */
 /************************************ */
 
 #ifndef __RSBAC_RC_TYPES_H
@@ -380,8 +380,6 @@ enum rsbac_rc_item_t { RI_role_comp,
 	RI_type_comp_netdev_log_never,
 	RI_type_comp_nettemp_log_never,
 	RI_type_comp_netobj_log_never,
-#ifdef __KERNEL__
-#endif
 	RI_none
 };
 
@@ -395,8 +393,6 @@ union rsbac_rc_item_value_t {
 	rsbac_boolean_t comp;
 	rsbac_boolean_t boot_role;
 	rsbac_boolean_t req_reauth;
-#ifdef __KERNEL__
-#endif
 	u_char u_char_dummy;
 	int dummy;
 	u_int u_dummy;
