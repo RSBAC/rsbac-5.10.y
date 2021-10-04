@@ -1,9 +1,9 @@
 /********************************** */
 /* Rule Set Based Access Control    */
-/* Author and (c) 1999-2018:        */
+/* Author and (c) 1999-2021:        */
 /*   Amon Ott <ao@rsbac.org>        */
 /* Getname functions for CAP module */
-/* Last modified: 17/Jan/2018       */
+/* Last modified: 04/Oct/2021       */
 /********************************** */
 
 #include <rsbac/getname.h>
@@ -11,7 +11,6 @@
 #include <rsbac/helpers.h>
 #include <rsbac/error.h>
 
-#ifdef __KERNEL__
 #include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/mm.h>
@@ -23,9 +22,6 @@
 #if defined(CONFIG_RSBAC_CAP_LEARN)
 #include <linux/file.h>
 #endif
-#else
-#include <string.h>
-#endif
 
 /*****************************************/
 
@@ -35,7 +31,6 @@ rsbac_list_ta_number_t cap_learn_ta = CONFIG_RSBAC_CAP_LEARN_TA;
 #define cap_learn_ta 0
 #endif
 
-#ifdef __KERNEL__
 #if defined(CONFIG_RSBAC_CAP_LOG_MISSING) || defined(CONFIG_RSBAC_CAP_LEARN)
 void rsbac_cap_log_missing_cap(int cap)
   {
@@ -447,5 +442,4 @@ void rsbac_cap_log_missing_cap(int cap)
           }
       }
   }
-#endif
 #endif
