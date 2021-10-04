@@ -1,9 +1,9 @@
 /*********************************** */
 /* Rule Set Based Access Control     */
-/* Author and (c) 1999-2018:         */
+/* Author and (c) 1999-2021:         */
 /*   Amon Ott <ao@rsbac.org>         */
 /* Getname functions for JAIL module */
-/* Last modified: 17/Jan/2018        */
+/* Last modified: 04/Oct/2021        */
 /*********************************** */
 
 #include <rsbac/getname.h>
@@ -11,18 +11,13 @@
 #include <rsbac/helpers.h>
 #include <rsbac/error.h>
 
-#ifdef __KERNEL__
 #include <linux/string.h>
 #include <linux/sched.h>
 #include <linux/cred.h>
 #include <rsbac/debug.h>
 #include <rsbac/aci.h>
 #include <rsbac/rkmem.h>
-#else
-#include <string.h>
-#endif
 
-#ifdef __KERNEL__
 #ifdef CONFIG_RSBAC_JAIL_LOG_MISSING
 void rsbac_jail_log_missing_cap(int cap)
   {
@@ -58,5 +53,4 @@ void rsbac_jail_log_missing_cap(int cap)
           }
       }
   }
-#endif
 #endif
