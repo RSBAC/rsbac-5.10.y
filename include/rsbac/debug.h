@@ -3,7 +3,7 @@
 /* Author and (c) 1999-2021:     */
 /*   Amon Ott <ao@rsbac.org>     */
 /* debug definitions             */
-/* Last modified: 27/Sep/2021    */
+/* Last modified: 04/Oct/2021    */
 /******************************* */
 
 #ifndef __RSBAC_DEBUG_H
@@ -11,23 +11,6 @@
 
 #include <linux/init.h>
 //#include <rsbac/types.h>
-
-#define set_rsbac_softmode 1
-#define set_rsbac_softmode_once 2
-#define set_rsbac_softmode_never 4
-#define set_rsbac_freeze 8
-#define set_rsbac_um_no_excl 16
-#define set_rsbac_auth_learn 32
-#define set_rsbac_acl_learn_fd 64
-#define set_rsbac_cap_log_missing 128
-#define set_rsbac_jail_log_missing 256
-#define set_rsbac_dac_disable 512
-#define set_rsbac_no_delay_init 1024
-#define set_rsbac_no_defaults 2048
-#define set_rsbac_nosyslog 4096
-#define set_rsbac_cap_process_hiding 8192
-#define set_rsbac_cap_learn 16384
-#define set_rsbac_rc_learn 32768
 
 extern unsigned long int rsbac_flags;
 extern void rsbac_flags_set(unsigned long int);
@@ -282,6 +265,10 @@ extern int rsbac_auth_learn;
 #if defined(CONFIG_RSBAC_RC_LEARN)
 extern int rsbac_rc_learn;
 #define RSBAC_RC_LEARN_TA_NAME "RC-learn"
+#endif
+
+#if defined(CONFIG_RSBAC_RC)
+extern int rsbac_rc_force_ipc_type;
 #endif
 
 #if defined(CONFIG_RSBAC_CAP_LEARN)

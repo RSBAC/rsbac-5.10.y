@@ -1,9 +1,9 @@
 /************************************ */
 /* Rule Set Based Access Control      */
-/* Author and (c) 1999-2005: Amon Ott */
+/* Author and (c) 1999-2021: Amon Ott */
 /* REG - Module Registration          */
 /* Internal declarations and types    */
-/* Last modified: 22/Jul/2005         */
+/* Last modified: 04/Oct/2021         */
 /************************************ */
 
 #ifndef __RSBAC_REG_MAIN_H
@@ -18,8 +18,6 @@
 /***************************************************/
 /*                   Types                         */
 /***************************************************/
-
-#ifdef __KERNEL__
 
 /* Since all registrations will be organized in double linked lists, we must  */
 /* have list items and a list head.                                        */
@@ -60,11 +58,5 @@ struct rsbac_reg_sc_list_head_t
       int                               readers;
       u_int                             count;
     };
-
-#endif /* __KERNEL__ */
-
-/***************************************************/
-/*                   Prototypes                    */
-/***************************************************/
 
 #endif

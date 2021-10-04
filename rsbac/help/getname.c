@@ -3,7 +3,7 @@
 /* Author and (c) 1999-2021:           */
 /*   Amon Ott <ao@rsbac.org>           */
 /* Helper functions for all parts      */
-/* Last modified: 20/Sep/2021          */
+/* Last modified: 04/Oct/2021          */
 /************************************* */
 
 #include <rsbac/types.h>
@@ -11,7 +11,6 @@
 #include <rsbac/helpers.h>
 #include <rsbac/error.h>
 
-#ifdef __KERNEL__
 #include <linux/string.h>
 #include <linux/module.h>
 #include <linux/fs.h>
@@ -26,11 +25,6 @@
 #ifdef CONFIG_RSBAC_LOG_PROGRAM_FILE
 #include <linux/file.h>
 #include <rsbac/aci.h>
-#endif
-#else
-#include <string.h>
-#include <stdio.h>
-#include <errno.h>
 #endif
 
 static char request_list[R_NONE + 1][24] = {
@@ -96,7 +90,7 @@ static char result_list[UNDEFINED + 1][12] = {
 	"UNDEFINED"
 };
 
-static rsbac_switch_target_int_t attr_mod_list[A_none + 1] = {
+static rsbac_switch_target_int_t attr_mod_list[A_last_user + 1] = {
 	SW_GEN,			/* pseudo */
 	SW_MAC,			/* security_level */
 	SW_MAC,			/* initial_security_level */
@@ -200,48 +194,6 @@ static rsbac_switch_target_int_t attr_mod_list[A_none + 1] = {
 	SW_UDF,			/* udf_checked */
 	SW_UDF,			/* udf_checker */
 	SW_UDF,			/* udf_do_check */
-#ifdef __KERNEL__
-	/* adf-request helpers */
-	SW_NONE,		/* group */
-	SW_NONE,		/* signal */
-	SW_NONE,		/* mode */
-	SW_NONE,		/* nlink */
-	SW_NONE,		/* switch_target */
-	SW_NONE,		/* mod_name */
-	SW_NONE,		/* request */
-	SW_NONE,		/* trace_request */
-	SW_NONE,		/* auth_add_f_cap */
-	SW_NONE,		/* auth_remove_f_cap */
-	SW_NONE,		/* auth_get_caplist */
-	SW_NONE,		/* prot_bits */
-	SW_NONE,		/* internal */
-	SW_NONE,		/* create_data */
-	SW_NONE,		/* new_object */
-	SW_NONE,		/* rlimit */
-	SW_NONE,		/* new_dir_dentry_p */
-	SW_NONE,		/* auth_start_uid */
-	SW_NONE,		/* auth_start_euid */
-	SW_NONE,		/* auth_start_gid */
-	SW_NONE,		/* auth_start_egid */
-	SW_NONE,		/* acl_learn */
-	SW_NONE,		/* priority */
-	SW_NONE,		/* pgid */
-	SW_NONE,		/* kernel_thread */
-	SW_NONE,		/* open_flag */
-	SW_NONE,		/* reboot_cmd */
-	SW_NONE,		/* setsockopt_level */
-	SW_NONE,		/* ioctl_cmd */
-	SW_NONE,		/* f_mode */
-	SW_NONE,		/* process */
-	SW_NONE,		/* sock_type */
-	SW_NONE,		/* pagenr */
-	SW_NONE,		/* cap_learn */
-	SW_NONE,		/* rc_learn */
-	SW_NONE,		/* old_dir_inode_p */
-	SW_NONE,		/* auth_add_f_cap */
-	SW_NONE,		/* auth_remove_f_cap */
-#endif
-	SW_NONE /* none */
 };
 
 static char attribute_list[A_none + 1][23] = {
@@ -348,7 +300,6 @@ static char attribute_list[A_none + 1][23] = {
 	"udf_checked",
 	"udf_checker",
 	"udf_do_check",
-#ifdef __KERNEL__
 	/* adf-request helpers */
 	"owner",
 	"group",
@@ -391,7 +342,7 @@ static char attribute_list[A_none + 1][23] = {
 	"auth_remove_p_cap",
 	"perf_flags",
 	"memfd_name",
-#endif
+	"rc_force_ipc_type",
 	"none"
 };
 
@@ -514,117 +465,6 @@ static char scd_type_list[ST_none + 1][17] = {
 	"perf",
 	"none"
 };
-
-/* Attribute types */
-
-#ifndef __KERNEL__
-static char attribute_param_list[A_none + 1][194] = {
-	"user-pseudo (positive long integer)", /* pseudo */
-	"0 = unclassified, 1 = confidential, 2 = secret,\n\t3 = top secret, 254 = inherit, max. level 252", /* security_level */
-	"0 = unclassified, 1 = confidential, 2 = secret,\n\t3 = top secret, 254 = inherit, max. level 252", /* initial_security_level */
-	"0 = unclassified, 1 = confidential, 2 = secret,\n\t3 = top secret, 254 = inherit, max. level 252", /* local_sec_level */
-	"0 = unclassified, 1 = confidential, 2 = secret,\n\t3 = top secret, 254 = inherit, max. level 252", /* remote_sec_level */
-	"0 = unclassified, 1 = confidential, 2 = secret,\n\t3 = top secret, 254 = inherit, max. level 252", /* min_security_level */
-	"Bit Set String of length 64 for all categories", /* mac_categories */
-	"Bit Set String of length 64 for all categories", /* mac_initial_categories */
-	"Bit Set String of length 64 for all categories", /* local_mac_categories */
-	"Bit Set String of length 64 for all categories", /* remote_mac_categories */
-	"Bit Set String of length 64 for all categories", /* mac_min_categories */
-	"1 = override, 4 = trusted, 8 = write_up, 16 = read_up,\n\t32 = write_down, 64 = allow_mac_auto", /* mac_user_flags */
-	"1 = override, 2 = auto, 4 = trusted, 8 = write_up,\n\t16 = read_up, 32 = write_down, 128 = prop_trusted", /* mac_process_flags */
-	"2 = auto, 4 = trusted, 8 = write_up, 16 = read_up,\n\t32 = write_down", /* mac_file_flags */
-	"0 = user, 1 = security officer, 2 = administrator,\n\t3 = auditor", /* system_role */
-	"0 = user, 1 = security officer, 2 = administrator,\n\t3 = auditor", /* mac_role */
-	"0 = user, 1 = security officer, 2 = administrator,\n\t3 = auditor", /* daz_role */
-	"0 = user, 1 = security officer, 2 = administrator,\n\t3 = auditor", /* ff_role */
-	"0 = user, 1 = security officer, 2 = administrator,\n\t3 = auditor", /* auth_role */
-	"0 = user, 1 = security officer, 2 = administrator,\n\t3 = auditor", /* cap_role */
-	"0 = user, 1 = security officer, 2 = administrator,\n\t3 = auditor", /* jail_role */
-	"0 = user, 1 = security officer, 2 = administrator,\n\t3 = auditor", /* pax_role */
-	"0 = unclassified, 1 = confidential, 2 = secret,\n\t3 = top secret, max. level 252", /* current_sec_level */
-	"Bit Set String of length 64 for all categories", /* mac_curr_categories */
-	"0 = unclassified, 1 = confidential, 2 = secret,\n\t3 = top secret, max. level 252", /* min_write_open */
-	"Bit Set String of length 64 for all categories", /* min_write_categories */
-	"0 = unclassified, 1 = confidential, 2 = secret,\n\t3 = top secret, max. level 252", /* max_read_open */
-	"Bit Set String of length 64 for all categories", /* max_read_categories */
-	"0 = no, 1 = yes, 2 = inherit (default value)", /* mac_auto */
-	"0 = false, 1 = true", /* mac_check */
-	"0 = false, 1 = true", /* mac_prop_trusted */
-	"0 = user, 1 = security officer, 2 = data protection officer,\n\t3 = TP-manager, 4 = system-admin", /* pm_role */
-	"0 = none, 1 = TP", /* pm_process_type */
-	"Task-ID (positive integer)", /* pm_current_task */
-	"Class-ID (positive integer)", /* pm_object_class */
-	"Class-ID (positive integer)", /* local_pm_object_class */
-	"Class-ID (positive integer)", /* remote_pm_object_class */
-	"Purpose-ID (positive integer)", /* pm_ipc_purpose */
-	"Purpose-ID (positive integer)", /* local_pm_ipc_purpose */
-	"Purpose-ID (positive integer)", /* remote_pm_ipc_purpose */
-	"0 = none, 1 = TP, 2 = personal data, 3 = non-personal data,\n\t4 = ipc, 5 = dir", /* pm_object_type */
-	"0 = none, 1 = TP, 2 = personal data, 3 = non-personal data,\n\t4 = ipc, 5 = dir", /* local_pm_object_type */
-	"0 = none, 1 = TP, 2 = personal data, 3 = non-personal data,\n\t4 = ipc, 5 = dir", /* remote_pm_object_type */
-	"0 = none, 1 = TP", /* pm_program_type */
-	"TP-ID (positive integer)", /* pm_tp */
-	"pm-task-list-ID (positive integer)", /* pm_task_set */
-	"0 = unscanned, 1 = infected, 2 = clean", /* daz_scanned */
-	"0 = FALSE, 1 = TRUE", /* daz_scanner */
-	"1 = read_only, 2 = execute_only, 4 = search_only, 8 = write_only,\n\t16 = secure_delete, 32 = no_execute, 64 = no_delete_or_rename,\n\t128 = add_inherited (or'd), 256 = append_only, 512 = no_mount", /* ff_flags */
-	"RC-type-id", /* rc_type */
-        "RC-type-id (-7 = use fd)", /* rc_select_type */
-	"RC-type-id", /* local_rc_type */
-	"RC-type-id", /* remote_rc_type */
-	"RC-type-id (-2 = inherit from parent)", /* rc_type_fd */
-	"RC-type-id", /* rc_type_nt */
-	"RC-role-id (-1 = inherit_user, -2 = inherit_process (keep),\n\t-3 = inherit_parent (def.),\n\t-4 = inherit_user_on_chown_only (root default)", /* rc_force_role */
-	"RC-role-id (-3 = inherit_parent (default),\n\t-5 = use_force_role (root default)", /* rc_initial_role */
-	"RC-role-id", /* rc_role */
-	"RC-role-id", /* rc_def_role */
-	"0 = off, 1 = full, 2 = last_auth_only, 3 = last_auth_and_gid", /* auth_may_setuid */
-	"0 = false, 1 = true", /* auth_may_set_cap */
-	"0 = false, 1 = true", /* auth_learn */
-	"Bit-Vector value or name list of desired caps", /* min_caps */
-	"Bit-Vector value or name list of desired caps", /* max_caps */
-	"Bit-Vector value or name list of desired caps", /* max_caps_user */
-	"Bit-Vector value or name list of desired caps", /* max_caps_program */
-	"JAIL ID (0 = off)", /* jail_id */
-	"JAIL ID (0 = no parent jail)", /* jail_parent */
-	"JAIL IP address a.b.c.d", /* jail_ip */
-	"JAIL flags (or'd, 1 = allow external IPC, 2 = allow all net families,\n\t4 = allow_rlimit, 8 = allow raw IP, 16 = auto adjust IP,\n\t32 = allow localhost, 64 = allow scd clock)", /* jail_flags */
-	"Bit-Vector value or name list of desired caps", /* jail_max_caps */
-	"List of SCD targets", /* jail_scd_get */
-	"List of SCD targets", /* jail_scd_modify */
-	"PAX flags with capital=on, non-capital=off, e.g. PeMRxS", /* pax_flags */
-	"0 = user, 1 = security officer, 2 = administrator", /* res_role */
-	"array of non-negative integer values, all 0 for unset", /* res_min */
-	"array of non-negative integer values, all 0 for unset", /* res_max */
-	"Bit-String for all Requests, low bit", /* log_array_low */
-	"Bit-String for all Requests, low bit", /* local_log_array_low */
-	"Bit-String for all Requests, low bit", /* remote_log_array_low */
-	"Bit-String for all Requests, high bit (l=0,h=0 = none, l=1,h=0 = denied,\n\tl=0,h=1 = full, l=1,h=1 = request based)", /* log_array_high */
-	"Bit-String for all Requests, high bit (l=0,h=0 = none, l=1,h=0 = denied,\n\tl=0,h=1 = full, l=1,h=1 = request based)", /* local_log_array_high */
-	"Bit-String for all Requests, high bit (l=0,h=0 = none, l=1,h=0 = denied,\n\tl=0,h=1 = full, l=1,h=1 = request based)", /* remote_log_array_high */
-	"Bit-String for all Requests", /* log_program_based */
-	"Bit-String for all Requests", /* log_user_based */
-	"Number of bytes to add, 0 to turn off", /* symlink_add_remote_ip */
-	"0 = false, 1 = true", /* symlink_add_uid */
-	"0 = false, 1 = true", /* symlink_add_mac_level */
-	"0 = false, 1 = true", /* symlink_add_rc_role */
-	"0 = false, 1 = true, 2 = inherit (default)", /* allow_write_exec */
-	"0 = off (default), 1 = from other users, 2 = full", /* cap_process_hiding */
-	"0 = off (default), 1 = uid_only, 2 = euid_only, 3 = both", /* fake_root_uid */
-	"-3 = unset, uid otherwise", /* audit_uid */
-	"-3 = unset, uid otherwise", /* auid_exempt */
-	"-3 = unset, uid otherwise", /* auth_last_auth */
-	"32 Bit value in network byte order", /* remote_ip */
-	"0 = disallow executing of program file with LD_ variables set,\n\t1 = do not care (default)", /* cap_ld_env */
-	"0 = never, 1 = registered, 2 = always, 3 = inherit", /* daz_do_scan */
-	"non-negative virtual set number, 0 = default main set",
-	"0 = user, 1 = security officer, 2 = administrator,\n\t3 = auditor", /* udf_role */
-	"0 = unchecked, 1 = denied, 2 = allowed", /* udf_checked */
-	"0 = FALSE, 1 = TRUE", /* udf_checker */
-	"0 = never, 1 = always, 2 = inherit, 3 = remoteonly", /* udf_do_check */
-	"INVALID!"
-};
-#endif
 
 static char log_level_list[LL_invalid + 1][9] = {
 	"none",
@@ -822,10 +662,8 @@ char *rsbac_get_syscall_name(char *syscall_name,
 
 /*****************************************/
 
-#ifdef __KERNEL__
 #if defined(CONFIG_RSBAC_REG) || defined(CONFIG_RSBAC_REG_MAINT)
 EXPORT_SYMBOL(get_request_name);
-#endif
 #endif
 
 char *get_request_name(char *request_name,
@@ -883,16 +721,14 @@ enum rsbac_adf_req_ret_t get_result_nr(const char *res_name)
 
 enum rsbac_switch_target_t get_attr_module(enum rsbac_attribute_t attr)
 {
-	if (attr > A_none)
+	if (attr > A_last_user)
 		return SW_NONE;
 	else
 		return attr_mod_list[attr];
 }
 
-#ifdef __KERNEL__
 #if defined(CONFIG_RSBAC_REG) || defined(CONFIG_RSBAC_REG_MAINT)
 EXPORT_SYMBOL(get_attribute_name);
-#endif
 #endif
 
 char *get_attribute_name(char *attr_name, enum rsbac_attribute_t attr)
@@ -920,10 +756,8 @@ enum rsbac_attribute_t get_attribute_nr(const char *attr_name)
 	return (A_none);
 }
 
-#ifdef __KERNEL__
 #if defined(CONFIG_RSBAC_REG) || defined(CONFIG_RSBAC_REG_MAINT)
 EXPORT_SYMBOL(get_attribute_value_name);
-#endif
 #endif
 
 char *get_attribute_value_name(char *attr_val_name,
@@ -939,7 +773,6 @@ char *get_attribute_value_name(char *attr_val_name,
 		case A_none:
 			strcpy(attr_val_name, "none");
 			break;
-#ifdef __KERNEL__
 		case A_create_data:
 			{
 				char *tmp =
@@ -1073,10 +906,9 @@ char *get_attribute_value_name(char *attr_val_name,
 			rsbac_get_net_type_name(attr_val_name,
 					attr_val_p->sock_type);
 			break;
-#endif
-#if defined(CONFIG_RSBAC_AUTH) || !defined(__KERNEL__)
+#if defined(CONFIG_RSBAC_AUTH)
 		case A_auth_last_auth:
-#if defined(CONFIG_RSBAC_AUTH_LEARN) && defined(__KERNEL__)
+#if defined(CONFIG_RSBAC_AUTH_LEARN)
 		case A_auth_start_uid:
 		case A_auth_start_euid:
 #endif
@@ -1107,13 +939,13 @@ char *get_attribute_value_name(char *attr_val_name,
 				RSBAC_GID_NUM(attr_val_p->auth_start_gid));
 			break;
 #endif
-#if defined(CONFIG_RSBAC_FF) || !defined(__KERNEL__)
+#if defined(CONFIG_RSBAC_FF)
 		case A_ff_flags:
 			sprintf(attr_val_name, "%u",
 				attr_val_p->ff_flags);
 			break;
 #endif
-#if defined(CONFIG_RSBAC_UDF) || !defined(__KERNEL__)
+#if defined(CONFIG_RSBAC_UDF)
 		case A_udf_checker:
 			sprintf(attr_val_name, "%u",
 				attr_val_p->udf_checker);
@@ -1138,10 +970,8 @@ char *get_attribute_value_name(char *attr_val_name,
 }
 
 
-#ifdef __KERNEL__
 #if defined(CONFIG_RSBAC_REG) || defined(CONFIG_RSBAC_REG_MAINT)
 EXPORT_SYMBOL(get_scd_type_name);
-#endif
 #endif
 
 char *get_scd_type_name(char *res_name, enum rsbac_scd_type_t res)
@@ -1169,10 +999,8 @@ enum rsbac_scd_type_t get_scd_type_nr(const char *res_name)
 	return (ST_none);
 }
 
-#ifdef __KERNEL__
 #if defined(CONFIG_RSBAC_REG) || defined(CONFIG_RSBAC_REG_MAINT)
 EXPORT_SYMBOL(rsbac_get_program_name);
-#endif
 #endif
 
 char *rsbac_get_program_name(void)
@@ -1232,23 +1060,16 @@ char *rsbac_get_program_name(void)
 	return program_name;
 }
 
-#ifdef __KERNEL__
 #if defined(CONFIG_RSBAC_REG) || defined(CONFIG_RSBAC_REG_MAINT)
 EXPORT_SYMBOL(get_target_name);
-#endif
 #endif
 
 char *get_target_name(char *target_type_name,
 		      enum rsbac_target_t target,
 		      char *target_id_name, union rsbac_target_id_t tid)
 {
-#ifdef __KERNEL__
 	char *help_name;
-#else
-	char help_name[RSBAC_MAXNAMELEN + 4];
-#endif
 
-#ifdef __KERNEL__
 #ifdef CONFIG_RSBAC_LOG_FULL_PATH
 	help_name = rsbac_kmalloc(CONFIG_RSBAC_MAX_PATH_LEN + 4);
 #else
@@ -1256,10 +1077,8 @@ char *get_target_name(char *target_type_name,
 #endif
 	if (!help_name)
 		return NULL;
-#endif
 
 	switch (target) {
-#ifdef __KERNEL__
 	case T_FD:
 		if(target_type_name)
 			strcpy(target_type_name, "FD");
@@ -1650,7 +1469,6 @@ char *get_target_name(char *target_type_name,
 			sprintf(target_id_name, "%p", tid.netobj.sock_p);
 		}
 		break;
-#endif				/* __KERNEL__ */
 	case T_IPC:
 		if(target_type_name)
 			strcpy(target_type_name, "IPC");
@@ -1773,9 +1591,7 @@ char *get_target_name(char *target_type_name,
 		if (target_id_name)
 			sprintf(target_id_name, "%u", target);
 	}
-#ifdef __KERNEL__
 	rsbac_kfree(help_name);
-#endif
 	if(target_type_name)
 		return target_type_name;
 	else
@@ -1886,10 +1702,8 @@ enum rsbac_ipc_type_t get_ipc_target_nr(const char *ipc_name)
 }
 
 
-#ifdef __KERNEL__
 #if defined(CONFIG_RSBAC_REG) || defined(CONFIG_RSBAC_REG_MAINT)
 EXPORT_SYMBOL(get_switch_target_name);
-#endif
 #endif
 
 char *get_switch_target_name(char *switch_name,
@@ -1911,13 +1725,9 @@ enum rsbac_switch_target_t get_switch_target_nr(const char *switch_name)
 	if (!switch_name)
 		return (SW_NONE);
 	for (i = 0; i < SW_NONE; i++) {
-#ifdef __KERNEL__
 		if (!strncmp
 		    (switch_name, switch_target_list[i],
 		     strlen(switch_target_list[i])))
-#else
-		if (!strcmp(switch_name, switch_target_list[i]))
-#endif
 		{
 			return (i);
 		}
@@ -1926,43 +1736,20 @@ enum rsbac_switch_target_t get_switch_target_nr(const char *switch_name)
 }
 
 
-#ifdef __KERNEL__
 #if defined(CONFIG_RSBAC_REG) || defined(CONFIG_RSBAC_REG_MAINT)
 EXPORT_SYMBOL(get_error_name);
-#endif
 #endif
 
 char *get_error_name(char *error_name, int error)
 {
 	if (!error_name)
 		return (NULL);
-#ifndef __KERNEL__
-	if((error == -1) && RSBAC_ERROR(-errno))
-		error = -errno;
-#endif
 	if (RSBAC_ERROR(error))
 		strcpy(error_name, error_list[(-error) - RSBAC_EPERM]);
 	else
-#ifdef __KERNEL__
 		inttostr(error_name, error);
-#else
-		strcpy(error_name, strerror(errno));
-#endif
 	return (error_name);
 }
-
-#ifndef __KERNEL__
-char *get_attribute_param(char *attr_name, enum rsbac_attribute_t attr)
-{
-	if (!attr_name)
-		return (NULL);
-	if (attr > A_none)
-		strcpy(attr_name, "ERROR!");
-	else
-		strcpy(attr_name, attribute_param_list[attr]);
-	return (attr_name);
-}
-#endif
 
 char *get_log_level_name(char *ll_name, enum rsbac_log_level_t target)
 {

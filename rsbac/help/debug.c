@@ -6,7 +6,7 @@
 /*                                           */
 /* Debug and logging functions for all parts */
 /*                                           */
-/* Last modified: 27/Sep/2021                */
+/* Last modified: 04/Oct/2021                */
 /******************************************* */
  
 #include <linux/uaccess.h>
@@ -180,6 +180,10 @@ int  rsbac_um_no_excl = 0;
 
 #if defined(CONFIG_RSBAC_RC_LEARN)
 int  rsbac_rc_learn = 0;
+#endif
+
+#if defined(CONFIG_RSBAC_RC)
+int  rsbac_rc_force_ipc_type = 0;
 #endif
 
 #if defined(CONFIG_RSBAC_AUTH)
@@ -356,6 +360,14 @@ __setup("rsbac_no_defaults", no_defaults_setup);
       return 1;
     }
   __setup("rsbac_rc_learn", rc_learn_setup);
+  #endif
+  #if defined(CONFIG_RSBAC_RC)
+  static int R_INIT rc_force_ipc_type_setup(char *line)
+    {
+      rsbac_rc_force_ipc_type = 1;
+      return 1;
+    }
+  __setup("rsbac_rc_force_ipc_type", rc_force_ipc_type_setup);
   #endif
   #if defined(CONFIG_RSBAC_AUTH)
   /* RSBAC: AUTH - set auth_may_setuid for /bin/login? */
@@ -1825,6 +1837,11 @@ debug_proc_show(struct seq_file *m, void *v)
                  rsbac_rc_learn);
 #endif
 
+#if defined(CONFIG_RSBAC_RC)
+  seq_printf(m, "rsbac_rc_force_ipc_type is %i\n",
+                 rsbac_rc_force_ipc_type);
+#endif
+
 #if defined(CONFIG_RSBAC_AUTH)
   seq_printf(m, "rsbac_auth_enable_login is %i\n",
                  rsbac_auth_enable_login);
@@ -2967,6 +2984,49 @@ static ssize_t debug_proc_write(struct file * file, const char __user * buf, siz
                    "debug_proc_write(): setting rsbac_rc_learn to %u\n",
                    debug_level);
             rsbac_rc_learn = debug_level;
+            err = count;
+            goto out;
+          }
+        else
+          {
+            goto out_inv;
+          }
+      }
+#endif
+
+#if defined(CONFIG_RSBAC_RC)
+/* Boolean switch for RC forcing IPC type */
+    /*
+     * Usage: echo "debug rc_force_ipc_type #N" > /proc/rsbac_info/debug
+     *   to set rsbac_rc_force_ipc_type to given value
+     */
+    if(!strncmp("rc_force_ipc_type", k_buf + 6, 17)) 
+      {
+	p += 18;
+
+        if( *p == '\0' )
+            goto out;
+
+        debug_level = simple_strtoul(p, NULL, 0);
+        /* only accept 0 or 1 */
+        if(!debug_level || (debug_level == 1))
+          {
+            rsbac_target_id.dummy = 0;
+            rsbac_attribute_value.rc_learn = debug_level;
+            if (!rsbac_adf_request(R_MODIFY_ATTRIBUTE,
+                                   task_pid(current),
+                                   T_NONE,
+                                   rsbac_target_id,
+                                   A_rc_force_ipc_type,
+                                   rsbac_attribute_value))
+              {
+                err = -EPERM;
+                goto out;
+              }
+            rsbac_printk(KERN_INFO
+                   "debug_proc_write(): setting rsbac_rc_force_ipc_type to %u\n",
+                   debug_level);
+            rsbac_rc_force_ipc_type = debug_level;
             err = count;
             goto out;
           }
@@ -4669,6 +4729,10 @@ inline void __init rsbac_init_debug(void)
     #ifdef CONFIG_RSBAC_JAIL_LOG_MISSING
     if(rsbac_jail_log_missing)
       rsbac_printk(KERN_DEBUG "rsbac_jail_log_missing is set\n");
+    #endif
+    #if defined(CONFIG_RSBAC_RC)
+    if(rsbac_rc_force_ipc_type)
+      rsbac_printk(KERN_DEBUG "rsbac_rc_force_ipc_type is set\n");
     #endif
     #ifdef CONFIG_RSBAC_RMSG_NOSYSLOG
     if(rsbac_nosyslog)
