@@ -1,10 +1,10 @@
 /************************************ */
 /* Rule Set Based Access Control      */
 /*                                    */
-/* Author and (c) 1999-2013: Amon Ott */
+/* Author and (c) 1999-2021: Amon Ott */
 /*                                    */
 /* Getname functions for ACL module   */
-/* Last modified: 27/Nov/2013         */
+/* Last modified: 04/Oct/2021         */
 /************************************ */
 
 #include <rsbac/types.h>
@@ -13,11 +13,7 @@
 #include <rsbac/helpers.h>
 #include <rsbac/error.h>
 
-#ifdef __KERNEL__
 #include <linux/string.h>
-#else
-#include <string.h>
-#endif
 
 static char  acl_subject_type_list[ACLS_NONE+1][6] = {
                           "USER",
@@ -62,24 +58,6 @@ char * get_acl_subject_type_name(char * name,
     return(name);
   };
 
-#ifndef __KERNEL__
-enum rsbac_acl_subject_type_t get_acl_subject_type_nr(const char * name)
-  {
-     enum  rsbac_acl_subject_type_t i;
-
-    if(!name)
-      return(ACLS_NONE);
-    for (i = 0; i < ACLS_NONE; i++)
-      {
-        if (!strcmp(name, acl_subject_type_list[i]))
-          {
-            return(i);
-          }
-      }
-    return(ACLS_NONE);
-  };
-#endif
-
 char * get_acl_group_syscall_name(char * name,
                                   enum rsbac_acl_group_syscall_type_t value)
   {
@@ -91,24 +69,6 @@ char * get_acl_group_syscall_name(char * name,
       strcpy(name, acl_group_syscall_list[value]);
     return(name);
   };
-
-#ifndef __KERNEL__
-enum rsbac_acl_group_syscall_type_t get_acl_group_syscall_nr(const char * name)
-  {
-    enum  rsbac_acl_group_syscall_type_t i;
-
-    if(!name)
-      return(ACLGS_none);
-    for (i = 0; i < ACLGS_none; i++)
-      {
-        if (!strcmp(name, acl_group_syscall_list[i]))
-          {
-            return(i);
-          }
-      }
-    return(ACLGS_none);
-  };
-#endif
 
 char * get_acl_scd_type_name(char * name,
                             enum rsbac_acl_scd_type_t value)
@@ -129,24 +89,6 @@ char * get_acl_scd_type_name(char * name,
     return(name);
   };
 
-#ifndef __KERNEL__
-enum rsbac_acl_scd_type_t get_acl_scd_type_nr(const char * name)
-  {
-     enum  rsbac_acl_scd_type_t i;
-    
-    if(!name)
-      return(AST_none);
-    for (i = 0; i < AST_none-32; i++)
-      {
-        if (!strcmp(name, acl_scd_type_list[i]))
-          {
-            return(i+32);
-          }
-      }
-    return(get_scd_type_nr(name));
-  };
-#endif
-
 char * get_acl_special_right_name(char * name,
                             enum rsbac_acl_special_rights_t value)
   {
@@ -165,21 +107,3 @@ char * get_acl_special_right_name(char * name,
     strcpy(name, acl_special_right_list[value]);
     return(name);
   };
-
-#ifndef __KERNEL__
-enum rsbac_acl_special_rights_t get_acl_special_right_nr(const char * name)
-  {
-     enum  rsbac_acl_special_rights_t i;
-    
-    if(!name)
-      return(ACLR_NONE);
-    for (i = 0; i < (ACLR_NONE - RSBAC_ACL_SPECIAL_RIGHT_BASE); i++)
-      {
-        if (!strcmp(name, acl_special_right_list[i]))
-          {
-            return(i + RSBAC_ACL_SPECIAL_RIGHT_BASE);
-          }
-      }
-    return(get_request_nr(name));
-  };
-#endif
