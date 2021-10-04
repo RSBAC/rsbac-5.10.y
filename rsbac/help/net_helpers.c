@@ -1,19 +1,17 @@
 /*
  * net_helpers.c: Helper functions for the Network.
  *
- * Author and Copyright (C) 1999-2018 Amon Ott <ao@rsbac.org>
+ * Author and Copyright (C) 1999-2021 Amon Ott <ao@rsbac.org>
  *
  *      This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License as
  *      published by the Free Software Foundation, version 2.
  *
- * Last modified 03/Aug/2018.
+ * Last modified 04/Oct/2021.
  */
 
 #include <rsbac/types.h>
-#ifdef __KERNEL__
 #include <rsbac/network.h>
-#endif
 
 static __u32 ipv4_mask[32] = {
   0x00000000, 0x00000080, 0x000000C0, 0x000000E0,
@@ -33,7 +31,6 @@ static inline __u32 rsbac_net_make_mask_u32(__u8 bits)
         return ipv4_mask[bits];
 }
 
-#ifdef __KERNEL__
 /* The lookup data param is always second, so we use it as description here! */
 int rsbac_net_compare_data(void *data1, void *data2)
 {
@@ -158,4 +155,3 @@ int rsbac_net_compare_data(void *data1, void *data2)
 	}
 	return 1;
 }
-#endif
