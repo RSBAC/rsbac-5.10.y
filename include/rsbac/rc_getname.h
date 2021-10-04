@@ -1,9 +1,9 @@
-/******************************** */
-/* Rule Set Based Access Control  */
-/* Author and (c) 1999: Amon Ott  */
-/* Getname functions for RC parts */
-/* Last modified: 18/Jan/99       */
-/******************************** */
+/************************************ */
+/* Rule Set Based Access Control      */
+/* Author and (c) 1999-2021: Amon Ott */
+/* Getname functions for RC parts     */
+/* Last modified: 04/Oct/2021         */
+/************************************ */
 
 #ifndef __RSBAC_RC_GETNAME_H
 #define __RSBAC_RC_GETNAME_H
@@ -30,15 +30,7 @@ char *get_rc_item_name(char *name, enum rsbac_rc_item_t value);
 
 enum rsbac_rc_item_t get_rc_item_nr(const char *name);
 
-#ifndef __KERNEL__
-char *get_rc_item_param(char *name, enum rsbac_rc_item_t value);
-#endif
-
 char *get_rc_special_right_name(char *name,
 				enum rsbac_rc_special_rights_t value);
-
-#ifndef __KERNEL__
-enum rsbac_rc_special_rights_t get_rc_special_right_nr(const char *name);
-#endif
 
 #endif

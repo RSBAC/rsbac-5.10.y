@@ -1,14 +1,13 @@
 /**************************************/
 /* Rule Set Based Access Control      */
-/* Author and (c) 1999-2020: Amon Ott */
+/* Author and (c) 1999-2021: Amon Ott */
 /* Data structures                    */
-/* Last modified: 22/Apr/2020         */
+/* Last modified: 04/Oct/2021         */
 /**************************************/
 
 #ifndef __RSBAC_DATA_STRUC_H
 #define __RSBAC_DATA_STRUC_H
 
-#ifdef __KERNEL__		/* only include in kernel code */
 #include <linux/types.h>
 #include <linux/fs.h>
 #include <linux/wait.h>
@@ -21,9 +20,6 @@
 #include <rsbac/aci.h>
 #include <rsbac/debug.h>
 #include <rsbac/lists.h>
-#endif				/* __KERNEL__ */
-
-#ifdef __KERNEL__
 
 /* List to keep mounts before init, so that we can rsbac_mount them at init */
 
@@ -100,8 +96,6 @@ struct rsbac_delayed_kfree_list_t {
 #define RSBAC_MAX_INIT_TIME 5
 #endif
 #endif				/* INIT_THREAD */
-
-#endif				/* __KERNEL__ */
 
 /* The following structures privide attributes for all possible targets.  */
 /* The data structures are kept in double linked lists, and are optimized */
@@ -438,7 +432,6 @@ struct rsbac_udf_fd_aci_t
       A_udf_do_check \
       }
 
-#ifdef __KERNEL__
 struct rsbac_fd_list_handles_t {
 	rsbac_list_handle_t gen;
 #if defined(CONFIG_RSBAC_MAC)
@@ -507,8 +500,6 @@ struct rsbac_device_list_head_t {
 	u_int count;
 };
 
-#endif				/* __KERNEL__ */
-
 /******************************/
 /* OK, now we define the block/char device ACI, holding all dev information */
 /* the ADF needs for decisions.                                           */
@@ -567,7 +558,6 @@ struct rsbac_mac_dev_aci_t {
       A_log_array_high \
       }
 
-#ifdef __KERNEL__
 struct rsbac_dev_handles_t {
 	rsbac_list_handle_t gen;
 #if defined(CONFIG_RSBAC_MAC)
@@ -577,7 +567,6 @@ struct rsbac_dev_handles_t {
 	rsbac_list_handle_t rc;
 #endif
 };
-#endif				/* __KERNEL__ */
 
 /**************************************************************************/
 /* Next we define the ipc ACI, holding all ipc information                */
@@ -619,7 +608,6 @@ struct rsbac_mac_ipc_aci_t {
       A_jail_id \
       }
 
-#ifdef __KERNEL__
 struct rsbac_ipc_handles_t {
 #if defined(CONFIG_RSBAC_MAC)
 	rsbac_list_handle_t mac;
@@ -631,7 +619,6 @@ struct rsbac_ipc_handles_t {
 	rsbac_list_handle_t jail;
 #endif
 };
-#endif				/* __KERNEL__ */
 
 /*************************************/
 /* The user ACI holds all user information the ADF needs. */
@@ -912,7 +899,6 @@ struct rsbac_res_old_user_aci_t {
       A_udf_role \
       }
 
-#ifdef __KERNEL__
 struct rsbac_user_handles_t {
 	rsbac_list_handle_t gen;
 #if defined(CONFIG_RSBAC_MAC)
@@ -941,7 +927,6 @@ struct rsbac_user_handles_t {
 	rsbac_list_handle_t udf;
 #endif
 };
-#endif
 
 /********************************/
 /* Process ACI. */
@@ -1229,7 +1214,6 @@ struct rsbac_udf_process_aci_t {
       A_allow_write_exec \
       }
 
-#ifdef __KERNEL__
 struct rsbac_process_handles_t {
 	rsbac_list_handle_t gen;
 #if defined(CONFIG_RSBAC_MAC)
@@ -1251,7 +1235,6 @@ struct rsbac_process_handles_t {
 	rsbac_list_handle_t udf;
 #endif
 };
-#endif				/* __KERNEL__ */
 
 
 /******************************/
@@ -1272,13 +1255,11 @@ struct rsbac_process_handles_t {
       A_rc_type \
       }
 
-#ifdef __KERNEL__
 struct rsbac_group_handles_t {
 #if defined(CONFIG_RSBAC_RC_UM_PROT)
 	rsbac_list_handle_t rc;
 #endif
 };
-#endif				/* __KERNEL__ */
 
 /********************************/
 /* NETDEV ACI */
@@ -1310,7 +1291,6 @@ struct rsbac_gen_netdev_aci_t {
       A_log_array_high \
       }
 
-#ifdef __KERNEL__
 struct rsbac_netdev_handles_t {
 #if defined(CONFIG_RSBAC_IND_NETDEV_LOG)
 	rsbac_list_handle_t gen;
@@ -1319,7 +1299,6 @@ struct rsbac_netdev_handles_t {
 	rsbac_list_handle_t rc;
 #endif
 };
-#endif				/* __KERNEL__ */
 
 /********************************/
 /* NETTEMP ACI */
@@ -1400,7 +1379,6 @@ struct rsbac_rc_nettemp_aci_t {
       A_remote_log_array_high \
       }
 
-#ifdef __KERNEL__
 struct rsbac_nettemp_handles_t {
 #if defined(CONFIG_RSBAC_IND_NETOBJ_LOG)
 	rsbac_list_handle_t gen;
@@ -1429,14 +1407,12 @@ struct rsbac_rnetobj_handles_t {
 	rsbac_list_handle_t rc;
 #endif
 };
-#endif				/* __KERNEL__ */
 
 
 /**********************************************/
 /*              Declarations                  */
 /**********************************************/
 
-#ifdef __KERNEL__
 extern rsbac_dev_t rsbac_root_dev;
 extern __u32 rsbac_root_dev_major;
 extern __u32 rsbac_root_dev_minor;
@@ -1455,13 +1431,10 @@ void rsbac_write_close(unsigned int fd);
 ssize_t rsbac_read_file(unsigned int fd, char *buf, size_t count);
 ssize_t rsbac_write_file(unsigned int fd, const char *buf, size_t count);
 
-#endif				/* __KERNEL__ */
 
 /**********************************************/
 /*          External Declarations             */
 /**********************************************/
-
-#ifdef __KERNEL__
 
 static inline struct dentry *lock_parent(struct dentry *dentry)
 {
@@ -1504,7 +1477,5 @@ static inline unsigned long rsbac_stack_free_space(void)
 #else
 #define rsbac_stack_free_space() 0
 #endif
-
-#endif				/* __KERNEL__ */
 
 #endif
