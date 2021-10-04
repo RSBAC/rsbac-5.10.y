@@ -4,7 +4,7 @@
 /*   Amon Ott <ao@rsbac.org>         */
 /* API: Data types for attributes    */
 /*      and standard module calls    */
-/* Last modified: 20/Sep/2021        */
+/* Last modified: 04/Oct/2021        */
 /*********************************** */
 
 #ifndef __RSBAC_TYPES_H
@@ -38,15 +38,10 @@
 #define RSBAC_API_MAX_VERSION_NR \
  ((RSBAC_API_MAX_VERSION_MAJOR << 16) | (RSBAC_API_MAX_VERSION_MID << 8) | RSBAC_API_MAX_VERSION_MINOR)
 
-#ifdef __KERNEL__
 #include <linux/types.h>
 #include <linux/capability.h>
 #include <linux/resource.h>
 #include <linux/time.h>
-#else
-#include <asm/types.h>
-#include <sys/types.h>
-#endif
 
 typedef __u32 rsbac_version_t;
 typedef __u64 rsbac_uid_t;           /* High 32 Bit virtual set, low uid */
@@ -82,7 +77,6 @@ struct rsbac_nanotime_t
       __u32 nsec;
     };
 
-#ifdef __KERNEL__
 #include <linux/fs.h>
 #include <linux/socket.h>
 #include <linux/pipe_fs_i.h>
@@ -91,9 +85,6 @@ struct rsbac_nanotime_t
 /* version checks */
 #ifndef LINUX_VERSION_CODE
 #include <linux/version.h>
-#endif
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-#error "RSBAC: unsupported kernel version"
 #endif
 
 #include <linux/pid.h>
@@ -128,8 +119,6 @@ typedef __u32 rsbac_dev_t;
 #define R_INIT
 #else
 #define R_INIT __init
-#endif
-
 #endif
 
 /* General */
@@ -264,7 +253,6 @@ typedef __u32 rsbac_old_inode_nr_t;
 enum    rsbac_allow_write_exec_t {AWX_false, AWX_true, AWX_inherit, AWX_relocate, AWX_none};
 typedef rsbac_enum_t rsbac_allow_write_exec_int_t;
 
-#ifdef __KERNEL__
 /* We need unique identifiers for each file/dir. inode means inode in */
 /* the file system.                                                   */
 struct rsbac_fs_file_t
@@ -279,7 +267,6 @@ struct rsbac_old_dev_t
       enum  rsbac_dev_type_t     type;
             dev_t                id;
     };
-#endif /* __KERNEL */
 
 /* We need unique ids for dev objects */
 struct rsbac_dev_desc_t
@@ -520,11 +507,7 @@ typedef __u8 rsbac_udf_do_check_t;
 
 #include <rsbac/network_types.h>
 
-#ifdef __KERNEL__
-    typedef struct socket * rsbac_net_obj_id_t;
-#else
-    typedef void * rsbac_net_obj_id_t;
-#endif
+typedef struct socket * rsbac_net_obj_id_t;
 
 struct rsbac_net_obj_desc_t
   {
@@ -628,13 +611,11 @@ enum   rsbac_target_t {T_FILE, T_DIR, T_FIFO, T_SYMLINK, T_DEV, T_IPC, T_SCD, T_
 
 union  rsbac_target_id_t
        {
-#ifdef __KERNEL__
           struct rsbac_fs_file_t    file;
           struct rsbac_fs_file_t    dir;
           struct rsbac_fs_file_t    fifo;
           struct rsbac_fs_file_t    symlink;
           struct rsbac_fs_file_t    unixsock;
-#endif
           struct rsbac_dev_desc_t   dev;
           struct rsbac_ipc_t        ipc;
           rsbac_enum_t              scd;
@@ -648,7 +629,6 @@ union  rsbac_target_id_t
           int                       dummy;
        };
 
-#ifdef __KERNEL__
 typedef rsbac_enum_t rsbac_log_entry_t[T_NONE+1];
 typedef rsbac_enum_t rsbac_old_log_entry_t[T_NONE];
 
@@ -665,7 +645,6 @@ struct rsbac_rlimit_t
            u_int            resource;
     struct rlimit           limit;
   };
-#endif
 
 enum rsbac_attribute_t
   {
@@ -772,7 +751,6 @@ enum rsbac_attribute_t
     A_udf_checked,
     A_udf_checker,
     A_udf_do_check,
-#ifdef __KERNEL__
     /* adf-request helpers */
     A_owner,
     A_group,
@@ -816,15 +794,17 @@ enum rsbac_attribute_t
     A_auth_remove_p_cap,
     A_perf_flags,
     A_memfd_name,
-#endif
+    A_rc_force_ipc_type,
     A_none};
+
+#define A_last_user A_udf_do_check
 
 union rsbac_attribute_value_t
   {
          rsbac_uid_t                 owner;           /* process owner */
          rsbac_pseudo_t              pseudo;
          rsbac_system_role_int_t     system_role;
-#if !defined(__KERNEL__) || defined(CONFIG_RSBAC_MAC)
+#if defined(CONFIG_RSBAC_MAC)
          rsbac_security_level_t      security_level;
          rsbac_mac_category_vector_t mac_categories;
          rsbac_security_level_t      current_sec_level;
@@ -837,10 +817,10 @@ union rsbac_attribute_value_t
          rsbac_boolean_t             mac_check;
          rsbac_boolean_t             mac_prop_trusted;
 #endif
-#if !defined(__KERNEL__) || defined(CONFIG_RSBAC_FF)
+#if defined(CONFIG_RSBAC_FF)
          rsbac_ff_flags_t            ff_flags;
 #endif
-#if !defined(__KERNEL__) || defined(CONFIG_RSBAC_RC)
+#if defined(CONFIG_RSBAC_RC)
          rsbac_rc_type_id_t          rc_type;
          rsbac_rc_type_id_t          rc_type_fd;
          rsbac_rc_role_id_t          rc_force_role;
@@ -849,7 +829,7 @@ union rsbac_attribute_value_t
          rsbac_rc_role_id_t          rc_def_role;
          rsbac_rc_type_id_t          rc_select_type;
 #endif
-#if !defined(__KERNEL__) || defined(CONFIG_RSBAC_AUTH)
+#if defined(CONFIG_RSBAC_AUTH)
          rsbac_auth_may_setuid_int_t auth_may_setuid;
          rsbac_boolean_t             auth_may_set_cap;
          rsbac_pid_t                 auth_p_capset;
@@ -857,7 +837,7 @@ union rsbac_attribute_value_t
          rsbac_boolean_t             auth_learn;
          rsbac_uid_t                 auth_last_auth;
 #endif
-#if !defined(__KERNEL__) || defined(CONFIG_RSBAC_CAP)
+#if defined(CONFIG_RSBAC_CAP)
          rsbac_cap_vector_t          min_caps;
          rsbac_cap_vector_t          max_caps;
          rsbac_cap_vector_t          max_caps_user;
@@ -865,7 +845,7 @@ union rsbac_attribute_value_t
          rsbac_cap_process_hiding_int_t cap_process_hiding;
          rsbac_cap_ld_env_int_t      cap_ld_env;
 #endif
-#if !defined(__KERNEL__) || defined(CONFIG_RSBAC_JAIL)
+#if defined(CONFIG_RSBAC_JAIL)
          rsbac_jail_id_t             jail_id;
          rsbac_jail_id_t             jail_parent;
          rsbac_jail_ip_t             jail_ip;
@@ -874,10 +854,10 @@ union rsbac_attribute_value_t
          rsbac_jail_scd_vector_t     jail_scd_modify;
          rsbac_cap_vector_t          jail_max_caps;
 #endif
-#if !defined(__KERNEL__) || defined(CONFIG_RSBAC_RES)
+#if defined(CONFIG_RSBAC_RES)
          rsbac_res_old_array_t       res_array;
 #endif
-#if !defined(__KERNEL__) || defined(CONFIG_RSBAC_UDF)
+#if defined(CONFIG_RSBAC_UDF)
          rsbac_udf_checked_t         udf_checked;
          rsbac_udf_checker_t         udf_checker;
          rsbac_udf_do_check_t        udf_do_check;
@@ -897,7 +877,7 @@ union rsbac_attribute_value_t
          rsbac_uid_t                 auid_exempt;
          __u32                       remote_ip;
          rsbac_um_set_t              vset;
-#ifdef __KERNEL__
+/* from here kernel only */
          rsbac_gid_t     	     group;        /* process/fd group */
     struct sockaddr                * sockaddr_p; /* socket address */
          int                         signal;        /* signal for kill */
@@ -937,7 +917,7 @@ union rsbac_attribute_value_t
          struct inode              * old_dir_inode_p;
          u_long                      perf_flags;
          char                      * memfd_name;
-#endif
+         rsbac_boolean_t             rc_force_ipc_type;
          u_char                      u_char_dummy;
          u_short                     u_short_dummy;
          int                         dummy;
@@ -954,7 +934,7 @@ union rsbac_attribute_value_cache_t
          rsbac_uid_t                 owner;           /* process owner */
          rsbac_pseudo_t              pseudo;
          rsbac_system_role_int_t     system_role;
-#if !defined(__KERNEL__) || defined(CONFIG_RSBAC_MAC)
+#if defined(CONFIG_RSBAC_MAC)
          rsbac_security_level_t      security_level;
          rsbac_mac_category_vector_t mac_categories;
          rsbac_security_level_t      current_sec_level;
@@ -967,10 +947,10 @@ union rsbac_attribute_value_cache_t
          rsbac_boolean_t             mac_check;
          rsbac_boolean_t             mac_prop_trusted;
 #endif
-#if !defined(__KERNEL__) || defined(CONFIG_RSBAC_FF)
+#if defined(CONFIG_RSBAC_FF)
          rsbac_ff_flags_t            ff_flags;
 #endif
-#if !defined(__KERNEL__) || defined(CONFIG_RSBAC_RC)
+#if defined(CONFIG_RSBAC_RC)
          rsbac_rc_type_id_t          rc_type;
          rsbac_rc_type_id_t          rc_type_fd;
          rsbac_rc_role_id_t          rc_force_role;
@@ -979,7 +959,7 @@ union rsbac_attribute_value_cache_t
          rsbac_rc_role_id_t          rc_def_role;
          rsbac_rc_type_id_t          rc_select_type;
 #endif
-#if !defined(__KERNEL__) || defined(CONFIG_RSBAC_UDF)
+#if defined(CONFIG_RSBAC_UDF)
          rsbac_udf_checked_t         udf_checked;
          rsbac_udf_checker_t         udf_checker;
          rsbac_udf_do_check_t        udf_do_check;
