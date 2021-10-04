@@ -1,13 +1,13 @@
 /*
  * rc_getname.c: Getname functions for the RC module.
  *
- * Author and Copyright (C) 1999-2013 Amon Ott <ao@rsbac.org>
+ * Author and Copyright (C) 1999-2021 Amon Ott <ao@rsbac.org>
  *
  *      This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License as
  *      published by the Free Software Foundation, version 2.
  *
- * Last modified 27/Nov/2013.
+ * Last modified 04/Oct/2021.
  */
 
 #include <rsbac/getname.h>
@@ -15,11 +15,7 @@
 #include <rsbac/helpers.h>
 #include <rsbac/error.h>
 
-#ifdef __KERNEL__
 #include <linux/string.h>
-#else
-#include <string.h>
-#endif
 
 #ifndef NULL
 #define NULL ((void *) 0)
@@ -113,52 +109,8 @@ static char rc_item_list[RI_none + 1][30] = {
 	"type_comp_netdev_log_never",
 	"type_comp_nettemp_log_never",
 	"type_comp_netobj_log_never",
-#ifdef __KERNEL__
-#endif
 	"none"
 };
-
-#ifndef __KERNEL__
-static char rc_item_param_list[RI_none + 1][100] = {
-	"\t0 = FALSE, 1 = TRUE",
-	"\t0 = FALSE, 1 = TRUE",
-	"\t0 = FALSE, 1 = TRUE",
-	"\t0 = FALSE, 1 = TRUE",
-	"\t0 = FALSE, 1 = TRUE",
-	"\t0 = FALSE, 1 = TRUE",
-	"0 = FALSE, 1 = TRUE",
-	"\t0 = FALSE, 1 = TRUE",
-	"\t0 = FALSE, 1 = TRUE",
-	"\t0 = FALSE, 1 = TRUE",
-	"0 = FALSE, 1 = TRUE",
-	"0 = FALSE, 1 = TRUE",
-	"0 = FALSE, 1 = TRUE",
-	"\t0 = no_admin, 1 = role_admin, 2 = system_admin\n\t\t\t(for RC administration only)",
-	"\t\tString, max. 15 chars",
-	"number, -2 = inherit from parent, -3 = no_create",
-	"parent_type new_type, -2 = inherit from parent,\n\t\t\t-3 = no_create",
-	"number, -2 = inherit from parent, -3 = no_create",
-	"number, -1 = inherit from process,\n\t\t\t-3 = no_create",
-	"number, -2 = inherit from parent (keep),\n\t\t\t-3 = no_create",
-	"number, -2 = inherit from parent (keep),\n\t\t\t-5 = use def_create of new role, -6 = no_chown",
-	"number, -1 = inherit from process (keep),\n\t\t\t-4 = no_execute",
-	"number, -3 = no_create",
-	"number, -7 = use_template (do not set)",
-	"\t0 = FALSE, 1 = TRUE",
-	"\tString, max. 15 chars",
-	"\tString, max. 15 chars",
-	"\tString, max. 15 chars",
-	"\tString, max. 15 chars",
-	"String, max. 15 chars",
-	"\tString, max. 15 chars",
-	"String, max. 15 chars",
-	"String, max. 15 chars",
-	"String, max. 15 chars",
-	"0 = FALSE, 1 = TRUE",
-	"\tString, max. 15 chars (read-only)",
-	"\t\t(none)"
-};
-#endif
 
 static char rc_special_right_list[RCR_NONE - RSBAC_RC_SPECIAL_RIGHT_BASE +
 				  1][20] = {
@@ -280,19 +232,6 @@ enum rsbac_rc_item_t get_rc_item_nr(const char *name)
 	return (RI_none);
 };
 
-#ifndef __KERNEL__
-char *get_rc_item_param(char *name, enum rsbac_rc_item_t value)
-{
-	if (!name)
-		return (NULL);
-	if (value > RI_none)
-		strcpy(name, "ERROR!");
-	else
-		strcpy(name, rc_item_param_list[value]);
-	return (name);
-};
-#endif
-
 char *get_rc_special_right_name(char *name,
 				enum rsbac_rc_special_rights_t value)
 {
@@ -309,19 +248,3 @@ char *get_rc_special_right_name(char *name,
 	strcpy(name, rc_special_right_list[value]);
 	return (name);
 };
-
-#ifndef __KERNEL__
-enum rsbac_rc_special_rights_t get_rc_special_right_nr(const char *name)
-{
-	enum rsbac_rc_special_rights_t i;
-
-	if (!name)
-		return (RCR_NONE);
-	for (i = 0; i < (RCR_NONE - RSBAC_RC_SPECIAL_RIGHT_BASE); i++) {
-		if (!strcmp(name, rc_special_right_list[i])) {
-			return (i + RSBAC_RC_SPECIAL_RIGHT_BASE);
-		}
-	}
-	return (get_request_nr(name));
-}
-#endif
