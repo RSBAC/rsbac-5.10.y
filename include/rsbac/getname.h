@@ -1,9 +1,9 @@
 /******************************** */
 /* Rule Set Based Access Control  */
-/* Author and (c) 1999-2016:      */
+/* Author and (c) 1999-2021:      */
 /* Amon Ott <ao@rsbac.org>        */
 /* Getname functions for all parts*/
-/* Last modified: 23/Aug/2016     */
+/* Last modified: 04/Oct/2021     */
 /******************************** */
 
 #ifndef __RSBAC_GETNAME_H
@@ -14,7 +14,7 @@
 #include <rsbac/syscalls.h>
 #endif
 
-#if defined(__KERNEL__) && defined(CONFIG_RSBAC_LOG_FULL_PATH)
+#if defined(CONFIG_RSBAC_LOG_FULL_PATH)
 #include <linux/fs.h>
 #if (CONFIG_RSBAC_MAX_PATH_LEN > 2000)
 #undef CONFIG_RSBAC_MAX_PATH_LEN
@@ -76,23 +76,17 @@ extern enum rsbac_switch_target_t get_switch_target_nr(const char *);
 extern char * get_error_name(char *,
                              int);
 
-#ifndef __KERNEL__
-extern char * get_attribute_param(char * , enum rsbac_attribute_t);
-#endif
-
 extern char * get_log_level_name(char *,
                                   enum rsbac_log_level_t);
 
 extern enum rsbac_log_level_t get_log_level_nr(const char *);
 
-#ifdef __KERNEL__
 int rsbac_lookup_full_path(struct dentry * dentry_p, char path[], int maxlen, int pseudonymize);
 
 static inline int rsbac_get_full_path(struct dentry * dentry_p, char path[], int maxlen)
 {
   return rsbac_lookup_full_path(dentry_p, path, maxlen, 1);
 }
-#endif
 
 char * get_cap_name(char * name,
                     u_int value);
