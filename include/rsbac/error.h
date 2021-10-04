@@ -1,18 +1,14 @@
 /************************************* */
 /* Rule Set Based Access Control       */
-/* Author and (c) 1999-2008: Amon Ott  */
+/* Author and (c) 1999-2021: Amon Ott  */
 /* Helper functions for all parts      */
-/* Last modified: 03/Mar/2008          */
+/* Last modified: 04/Oct/2021          */
 /************************************* */
 
 #ifndef __RSBAC_ERROR_H
 #define __RSBAC_ERROR_H
 
-#ifdef __KERNEL__
 #include <linux/errno.h>
-#else
-#include <errno.h>
-#endif
 
 /* Error values             */
 
@@ -54,13 +50,5 @@
 #define RSBAC_EMAX 1034
 
 #define RSBAC_ERROR( res ) ((res <= -RSBAC_EPERM) && (res >= -RSBAC_EMAX))
-
-#ifndef __KERNEL__
-/* exit on error */
-void error_exit(int error);
-
-/* show error */
-void show_error(int error);
-#endif
 
 #endif
