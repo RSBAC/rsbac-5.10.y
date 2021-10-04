@@ -1,13 +1,13 @@
 /*
  * net_getname.c: Getname functions for the Network
  *
- * Author and Copyright (C) 1999-2018 Amon Ott <ao@rsbac.org>
+ * Author and Copyright (C) 1999-2021 Amon Ott <ao@rsbac.org>
  *
  *      This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License as
  *      published by the Free Software Foundation, version 2.
  *
- * Last modified 03/Aug/2018.
+ * Last modified 04/Oct/2021.
  */
 
 #include <rsbac/types.h>
@@ -16,14 +16,8 @@
 #include <rsbac/helpers.h>
 #include <rsbac/error.h>
 
-#ifdef __KERNEL__
 #include <linux/string.h>
 #include <linux/module.h>
-#else
-#include <linux/socket.h>
-#include <string.h>
-#include <stdio.h>
-#endif
 
 static char net_temp_syscall_list[NTS_none + 1][19] = {
 	"new_template",
@@ -168,27 +162,8 @@ char *rsbac_get_net_temp_syscall_name(char *name,
 	return name;
 };
 
-#ifndef __KERNEL__
-enum rsbac_net_temp_syscall_t rsbac_get_net_temp_syscall_nr(const char
-							    *name)
-{
-	enum rsbac_net_temp_syscall_t i;
-
-	if (!name)
-		return NTS_none;
-	for (i = 0; i < NTS_none; i++) {
-		if (!strcmp(name, net_temp_syscall_list[i])) {
-			return i;
-		}
-	}
-	return NTS_none;
-};
-#endif
-
-#ifdef __KERNEL__
 #if defined(CONFIG_RSBAC_REG) || defined(CONFIG_RSBAC_REG_MAINT)
 EXPORT_SYMBOL(rsbac_get_net_family_name);
-#endif
 #endif
 char *rsbac_get_net_family_name(char *name, u_int value)
 {
@@ -201,10 +176,8 @@ char *rsbac_get_net_family_name(char *name, u_int value)
 	return name;
 };
 
-#ifdef __KERNEL__
 #if defined(CONFIG_RSBAC_REG) || defined(CONFIG_RSBAC_REG_MAINT)
 EXPORT_SYMBOL(rsbac_get_net_netlink_family_name);
-#endif
 #endif
 char *rsbac_get_net_netlink_family_name(char *name, u_int value)
 {
@@ -219,28 +192,8 @@ char *rsbac_get_net_netlink_family_name(char *name, u_int value)
 	return name;
 };
 
-#ifndef __KERNEL__
-int rsbac_get_net_family_nr(const char *name)
-{
-	int i;
-
-	if (!name)
-		return AF_MAX;
-	if (!strcmp(name, "ANY")
-		return RSBAC_NET_NETLINK_PROTO_ANY;
-	for (i = 0; i < AF_MAX; i++) {
-		if (!strcmp(name, net_family_list[i])) {
-			return i;
-		}
-	}
-	return AF_MAX;
-};
-#endif
-
-#ifdef __KERNEL__
 #if defined(CONFIG_RSBAC_REG) || defined(CONFIG_RSBAC_REG_MAINT)
 EXPORT_SYMBOL(rsbac_get_net_protocol_name);
-#endif
 #endif
 char *rsbac_get_net_protocol_name(char *name, u_int value)
 {
@@ -262,26 +215,8 @@ char *rsbac_get_net_protocol_name(char *name, u_int value)
 	return name;
 };
 
-#ifndef __KERNEL__
-int rsbac_get_net_protocol_nr(const char *name)
-{
-	int i;
-
-	if (!name)
-		return RSBAC_NET_PROTO_MAX;
-	for (i = 0; i < NR_PROTO; i++) {
-		if (!strcmp(name, net_protocol_list[i].name)) {
-			return net_protocol_list[i].nr;
-		}
-	}
-	return RSBAC_NET_PROTO_MAX;
-};
-#endif
-
-#ifdef __KERNEL__
 #if defined(CONFIG_RSBAC_REG) || defined(CONFIG_RSBAC_REG_MAINT)
 EXPORT_SYMBOL(rsbac_get_net_type_name);
-#endif
 #endif
 char *rsbac_get_net_type_name(char *name, u_int value)
 {
@@ -294,23 +229,6 @@ char *rsbac_get_net_type_name(char *name, u_int value)
 	return name;
 };
 
-#ifndef __KERNEL__
-int rsbac_get_net_type_nr(const char *name)
-{
-	int i;
-
-	if (!name)
-		return RSBAC_NET_TYPE_MAX;
-	for (i = 0; i < RSBAC_NET_TYPE_MAX; i++) {
-		if (!strcmp(name, rsbac_net_type_list[i])) {
-			return i;
-		}
-	}
-	return RSBAC_NET_TYPE_MAX;
-};
-#endif
-
-#ifdef __KERNEL__
 int rsbac_net_str_to_inet(char *str, __u32 * addr)
 {
 	char *end;
@@ -349,7 +267,6 @@ int rsbac_net_str_to_inet(char *str, __u32 * addr)
 	*addr = htonl(*addr);
 	return 0;
 }
-#endif
 
 char * rsbac_net_inet6_to_str(char * string, void * inet6)
 {
