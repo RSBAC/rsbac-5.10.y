@@ -122,6 +122,66 @@ check_comp_rc(enum rsbac_target_t target,
 		rsbac_pr_get_error_num(i_attr, err);
 		return NOT_GRANTED;
 	}
+	if (rsbac_rc_force_ipc_type && target == T_IPC && !i_attr_val2.rc_type) {
+		union rsbac_rc_target_id_t i_rc_tid;
+		union rsbac_rc_item_value_t i_rc_item_val1;
+
+		/* get def_ipc_create_type of role */
+		i_rc_tid.role = i_attr_val1.rc_role;
+		if ((err = rsbac_rc_get_item(0,
+					     RT_ROLE,
+					     i_rc_tid,
+					     i_rc_tid,
+					     RI_def_ipc_create_type,
+					     &i_rc_item_val1,
+					     NULL))) {
+			rsbac_rc_pr_get_error(RI_def_ipc_create_type);
+			return NOT_GRANTED;
+		}
+		switch (i_rc_item_val1.type_id) {
+			case RC_type_no_create:
+				if ((request > R_NONE) || (rsbac_log_levels[request][target] != LL_none)) {
+					rsbac_pr_debug(adf_rc, "pid %u(%s), owner %u, rc_role %u, def_ipc_create_type no_create, request CREATE -> NOT_GRANTED!\n",
+						       pid_nr(caller_pid), current->comm,
+						       __kuid_val(current_uid()),
+						       i_attr_val1.rc_role);
+				}
+				return NOT_GRANTED;
+
+			case RC_type_use_new_role_def_create:
+				/* error - complain and return error */
+				rsbac_printk(KERN_WARNING "check_comp_rc(): invalid type use_new_role_def_create in def_ipc_create_type of role %i!\n",
+					     i_attr_val1.rc_role);
+				return NOT_GRANTED;
+
+			case RC_type_inherit_parent:
+			case RC_type_inherit_process:
+			case RC_type_use_fd:
+				/* error - complain and return error */
+				rsbac_printk(KERN_WARNING "check_comp_rc(): invalid type inherit_parent in def_ipc_create_type of role %i!\n",
+					     i_attr_val1.rc_role);
+				return NOT_GRANTED;
+
+			default:
+				i_attr_val2.rc_type = i_rc_item_val1.type_id;
+		}
+		if (rsbac_debug_adf_rc && i_rc_item_val1.type_id) {
+			char * program_name;
+			char target_id_name[2 * RSBAC_MAXNAMELEN];
+
+			target_id_name[0] = 0;
+			program_name = rsbac_get_program_name();
+			get_target_name(NULL, T_IPC, target_id_name, tid);
+			rsbac_pr_debug(adf_rc, "pid %u(%s), program %s, rc_role %u, IPC target %s, request %s: rc_type is 0, forcing to check against def_ipc_create_type %u!\n",
+				pid_nr(caller_pid),
+				current->comm,
+				program_name,
+				i_attr_val1.rc_role,
+				target_id_name,
+				i_attr_val2.rc_type);
+			kfree(program_name);
+		}
+	}
 
 	/* get type_comp_xxx of role */
 	i_rc_subtid.type = i_attr_val2.rc_type;
