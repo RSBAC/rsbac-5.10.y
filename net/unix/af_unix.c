@@ -875,6 +875,7 @@ static int unix_release(struct socket *sock)
 	if (   sock->file
 		&& sock->file->f_path.dentry
 		&& sock->file->f_path.dentry->d_inode
+		&& sock->file->f_path.dentry->d_inode->i_nlink <= 1
 	   ) {
 		rsbac_target_id.ipc.type = I_anonunix;
 		rsbac_target_id.ipc.id.id_nr = sock->file->f_path.dentry->d_inode->i_ino;
@@ -2647,14 +2648,15 @@ static int unix_dgram_recvmsg(struct socket *sock, struct msghdr *msg,
 			rsbac_target_id.unixsock.inode  = unix_sk(unix_peer(sk))->path.dentry->d_inode->i_ino;
 			rsbac_target_id.unixsock.dentry_p = unix_sk(unix_peer(sk))->path.dentry;
 		} else {
-			rsbac_target = T_IPC;
-			rsbac_target_id.ipc.type = I_anonunix;
 			if (   unix_peer(sk)->sk_socket
 			    && unix_peer(sk)->sk_socket->file
 			    && unix_peer(sk)->sk_socket->file->f_path.dentry
 			    && unix_peer(sk)->sk_socket->file->f_path.dentry->d_inode
-			   )
+			   ) {
+				rsbac_target = T_IPC;
+				rsbac_target_id.ipc.type = I_anonunix;
 				rsbac_target_id.ipc.id.id_nr = unix_peer(sk)->sk_socket->file->f_path.dentry->d_inode->i_ino;
+			}
 		}
 	} else {
 		if (   unix_sk(sk)->path.dentry
@@ -2665,15 +2667,14 @@ static int unix_dgram_recvmsg(struct socket *sock, struct msghdr *msg,
 			rsbac_target_id.unixsock.inode  = unix_sk(sk)->path.dentry->d_inode->i_ino;
 			rsbac_target_id.unixsock.dentry_p = unix_sk(sk)->path.dentry;
 		} else {
-			rsbac_target = T_IPC;
-			rsbac_target_id.ipc.type = I_anonunix;
 			if (   sock->file
 			    && sock->file->f_path.dentry
 			    && sock->file->f_path.dentry->d_inode
-			   )
+			   ) {
+				rsbac_target = T_IPC;
+				rsbac_target_id.ipc.type = I_anonunix;
 				rsbac_target_id.ipc.id.id_nr = sock->file->f_path.dentry->d_inode->i_ino;
-			else
-				rsbac_target_id.ipc.id.id_nr = 0;
+			}
 		}
 	}
 	if (   sk->sk_peer_pid
@@ -2685,7 +2686,7 @@ static int unix_dgram_recvmsg(struct socket *sock, struct msghdr *msg,
 		rsbac_attribute = A_sock_type;
 		rsbac_attribute_value.sock_type = sock->type;
 	}
-	if(!rsbac_adf_request(R_RECEIVE,
+	if(rsbac_target != T_NONE && !rsbac_adf_request(R_RECEIVE,
 				task_pid(current),
 				rsbac_target,
 				rsbac_target_id,
@@ -2787,7 +2788,7 @@ out_free:
 out:
 
 #if defined(CONFIG_RSBAC)
-	if (err > 0) {
+	if (rsbac_target != T_NONE && err > 0) {
 		rsbac_new_target_id.dummy = 0;
 		if (unlikely(rsbac_adf_set_attr(R_RECEIVE,
 					task_pid(current),

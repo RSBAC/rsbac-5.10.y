@@ -5,7 +5,7 @@
 /*                                                   */
 /* Author and (c) 1999-2021: Amon Ott <ao@rsbac.org> */
 /*                                                   */
-/* Last modified: 27/Sep/2021                        */
+/* Last modified: 05/Oct/2021                        */
 /*************************************************** */
 
 #include <linux/string.h>
@@ -1869,6 +1869,12 @@ general_work:
                         break;
                       /* memfd removed at iput_final() */
                       case I_memfd:
+                        break;
+                      /* anonunix removed at unix_release() */
+                      case I_anonunix:
+                        break;
+                      /* anonpipe removed at put_pipe_info() */
+                      case I_anonpipe:
                         break;
                       default:
                         rsbac_remove_target(target, &tid);
