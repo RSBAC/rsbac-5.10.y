@@ -165,21 +165,20 @@ check_comp_rc(enum rsbac_target_t target,
 			default:
 				i_attr_val2.rc_type = i_rc_item_val1.type_id;
 		}
-		if (rsbac_debug_adf_rc && i_rc_item_val1.type_id) {
-			char * program_name;
-			char target_id_name[2 * RSBAC_MAXNAMELEN];
+		if (rsbac_debug_adf_rc && i_rc_item_val1.type_id != 0) {
+			char * target_id_name = rsbac_kmalloc(2 * RSBAC_MAXNAMELEN);
+			char * request_name = rsbac_kmalloc(RSBAC_MAXNAMELEN);
 
-			target_id_name[0] = 0;
-			program_name = rsbac_get_program_name();
 			get_target_name(NULL, T_IPC, target_id_name, tid);
-			rsbac_pr_debug(adf_rc, "pid %u(%s), program %s, rc_role %u, IPC target %s, request %s: rc_type is 0, forcing to check against def_ipc_create_type %u!\n",
+			rsbac_pr_debug(adf_rc, "pid %u(%s), rc_role %u, IPC target %s, request %s: rc_type is 0, forcing to check against def_ipc_create_type %u!\n",
 				pid_nr(caller_pid),
 				current->comm,
-				program_name,
 				i_attr_val1.rc_role,
 				target_id_name,
+				get_request_name(request_name, request),
 				i_attr_val2.rc_type);
-			kfree(program_name);
+			rsbac_kfree(target_id_name);
+			rsbac_kfree(request_name);
 		}
 	}
 
@@ -1327,8 +1326,7 @@ rsbac_adf_request_rc(enum rsbac_adf_request_t request,
 		switch (target) {
 		case T_DIR:
 			/* check, whether we may create files/dirs in this dir */
-			result =
-			    check_comp_rc(target, tid, request,
+			result = check_comp_rc(target, tid, request,
 					  caller_pid);
 			if (   (result != GRANTED)
 			    && (result != DO_NOT_CARE)
@@ -2939,14 +2937,12 @@ inline int rsbac_adf_set_attr_rc(enum rsbac_adf_request_t request,
 						     RI_def_ipc_create_type,
 						     &i_rc_item_val1,
 						     NULL))) {
-				rsbac_rc_pr_get_error
-				    (RI_def_ipc_create_type);
+				rsbac_rc_pr_get_error(RI_def_ipc_create_type);
 				return -RSBAC_EREADFAILED;
 			}
 			switch (i_rc_item_val1.type_id) {
 			case RC_type_no_create:
 				return -RSBAC_EDECISIONMISMATCH;
-				break;
 
 			case RC_type_use_new_role_def_create:
 				/* error - complain and return error */
@@ -2963,8 +2959,7 @@ inline int rsbac_adf_set_attr_rc(enum rsbac_adf_request_t request,
 
 			default:
 				/* set rc_type for ipc target */
-				i_attr_val1.rc_type =
-				    i_rc_item_val1.type_id;
+				i_attr_val1.rc_type = i_rc_item_val1.type_id;
 				/* get type from target */
 				if ((err = rsbac_get_attr(SW_RC,
 							  target,
@@ -2976,16 +2971,42 @@ inline int rsbac_adf_set_attr_rc(enum rsbac_adf_request_t request,
 					return -RSBAC_EREADFAILED;
 				}
 				/* set it for new target, if different */
-				if (i_attr_val1.rc_type !=
-				    i_attr_val2.rc_type) {
-					if ((err =
-					     rsbac_set_attr(SW_RC, target,
+				if (i_attr_val1.rc_type != i_attr_val2.rc_type) {
+#if 0
+					if (rsbac_debug_adf_rc) {
+						char * target_id_name = rsbac_kmalloc(2 * RSBAC_MAXNAMELEN);
+
+						get_target_name(NULL, T_IPC, target_id_name, tid);
+						rsbac_pr_debug(adf_rc, "pid %u(%s), rc_role %u, IPC target %s, request CREATE: set rc_type to %u!\n",
+							pid_nr(caller_pid),
+							current->comm,
+							i_attr_val1.rc_role,
+							target_id_name,
+							i_attr_val1.rc_type);
+						rsbac_kfree(target_id_name);
+					}
+#endif
+					if ((err = rsbac_set_attr(SW_RC, target,
 							    tid, A_rc_type,
-							    i_attr_val1)))
-					{
+							    i_attr_val1))) {
 						rsbac_pr_set_error_num(A_rc_type, err);
 						return -RSBAC_EWRITEFAILED;
 					}
+#if 0
+					if ((err = rsbac_get_attr(SW_RC,
+								  target,
+								  tid,
+								  A_rc_type,
+								  &i_attr_val2,
+								  FALSE))) {
+						rsbac_pr_get_error_num(A_rc_type, err);
+					} else {
+						if (i_attr_val1.rc_type != i_attr_val2.rc_type)
+							rsbac_pr_debug(adf_rc, "pid %u(%s), rc_role %u, IPC target %s, request CREATE: set rc_type to %u, but read %u!\n",
+							i_attr_val1.rc_type,
+							i_attr_val2.rc_type);
+					}
+#endif
 				}
 			}
 			return 0;
