@@ -2957,7 +2957,7 @@ static ssize_t debug_proc_write(struct file * file, const char __user * buf, siz
      * Usage: echo "debug rc_learn #N" > /proc/rsbac_info/debug
      *   to set rsbac_rc_learn to given value
      */
-    if(!strncmp("rc_learn", k_buf + 6, 8)) 
+    if(!strncmp("rc_learn", k_buf + 6, 8))
       {
 	p += 9;
 
@@ -3000,7 +3000,7 @@ static ssize_t debug_proc_write(struct file * file, const char __user * buf, siz
      * Usage: echo "debug rc_force_ipc_type #N" > /proc/rsbac_info/debug
      *   to set rsbac_rc_force_ipc_type to given value
      */
-    if(!strncmp("rc_force_ipc_type", k_buf + 6, 17)) 
+    if(!strncmp("rc_force_ipc_type", k_buf + 6, 17))
       {
 	p += 18;
 
