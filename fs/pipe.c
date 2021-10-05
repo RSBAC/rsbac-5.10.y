@@ -831,87 +831,14 @@ pipe_fasync(int fd, struct file *filp, int on)
 	struct pipe_inode_info *pipe = filp->private_data;
 	int retval = 0;
 
-#ifdef CONFIG_RSBAC_RW
-	union rsbac_target_id_t rsbac_target_id;
-	union rsbac_target_id_t rsbac_new_target_id;
-	union rsbac_attribute_value_t rsbac_attribute_value;
-#endif
-
 	__pipe_lock(pipe);
-	if (filp->f_mode & FMODE_READ) {
-#ifdef CONFIG_RSBAC_RW
-		rsbac_pr_debug(aef, "calling ADF\n");
-		rsbac_target_id.ipc.type = I_anonpipe;
-		rsbac_target_id.ipc.id.id_nr = filp->f_inode->i_ino;
-		rsbac_attribute_value.dummy = 0;
-
-		if (!rsbac_adf_request(R_READ,
-					task_pid(current),
-					T_IPC,
-					rsbac_target_id,
-					A_none,
-					rsbac_attribute_value)) {
-			__pipe_unlock(pipe);
-			return -EPERM;
-		}
-#endif
-
+	if (filp->f_mode & FMODE_READ)
 		retval = fasync_helper(fd, filp, on, &pipe->fasync_readers);
-
-#ifdef CONFIG_RSBAC_RW
-		rsbac_new_target_id.dummy = 0;
-
-		if (unlikely((retval >= 0) && rsbac_adf_set_attr(R_READ,
-					task_pid(current),
-					T_IPC,
-					rsbac_target_id,
-					T_NONE,
-					rsbac_new_target_id,
-					A_none,
-					rsbac_attribute_value))) {
-			rsbac_printk(KERN_WARNING "pipe_fasync(): rsbac_adf_set_attr() for READ returned error\n");
-		}
-#endif
-
-	}
 	if ((filp->f_mode & FMODE_WRITE) && retval >= 0) {
-#ifdef CONFIG_RSBAC_RW
-		rsbac_pr_debug(aef, "calling ADF\n");
-		rsbac_target_id.ipc.type = I_anonpipe;
-		rsbac_target_id.ipc.id.id_nr = filp->f_inode->i_ino;
-		rsbac_attribute_value.dummy = 0;
-
-		if (!rsbac_adf_request(R_WRITE,
-					task_pid(current),
-					T_IPC,
-					rsbac_target_id,
-					A_none,
-					rsbac_attribute_value)) {
-			__pipe_unlock(pipe);
-			return -EPERM;
-		}
-#endif
-
 		retval = fasync_helper(fd, filp, on, &pipe->fasync_writers);
 		if (retval < 0 && (filp->f_mode & FMODE_READ))
 			/* this can happen only if on == T */
 			fasync_helper(-1, filp, 0, &pipe->fasync_readers);
-
-#ifdef CONFIG_RSBAC_RW
-		rsbac_new_target_id.dummy = 0;
-
-		if (unlikely((retval >= 0) && rsbac_adf_set_attr(R_WRITE,
-					task_pid(current),
-					T_IPC,
-					rsbac_target_id,
-					T_NONE,
-					rsbac_new_target_id,
-					A_none,
-					rsbac_attribute_value))) {
-			rsbac_printk(KERN_WARNING "pipe_fasync(): rsbac_adf_set_attr() for WRITE returned error\n");
-		}
-#endif
-
 	}
 	__pipe_unlock(pipe);
 	return retval;
@@ -1083,10 +1010,14 @@ int create_pipe_files(struct file **res, int flags)
 	union rsbac_attribute_value_t rsbac_attribute_value;
 #endif
 
+	inode = get_pipe_inode();
+	if (!inode)
+		return -ENFILE;
+
 #ifdef CONFIG_RSBAC
 	rsbac_pr_debug(aef, "create_pipe_files() [sys_pipe()]: calling ADF\n");
 	rsbac_target_id.ipc.type = I_anonpipe;
-	rsbac_target_id.ipc.id.id_nr = 0;
+	rsbac_target_id.ipc.id.id_nr = inode->i_ino;
 	rsbac_attribute_value.dummy = 0;
 	if (!rsbac_adf_request(R_CREATE,
 				task_pid(current),
@@ -1094,13 +1025,11 @@ int create_pipe_files(struct file **res, int flags)
 				rsbac_target_id,
 				A_none,
 				rsbac_attribute_value)) {
+		free_pipe_info(inode->i_pipe);
+		iput(inode);
 		return -EPERM;
 	}
 #endif
-
-	inode = get_pipe_inode();
-	if (!inode)
-		return -ENFILE;
 
 	if (flags & O_NOTIFICATION_PIPE) {
 		error = watch_queue_init(inode->i_pipe);
@@ -1130,8 +1059,6 @@ int create_pipe_files(struct file **res, int flags)
 		return PTR_ERR(res[0]);
 	}
 #ifdef CONFIG_RSBAC
-	rsbac_target_id.ipc.type = I_anonpipe;
-	rsbac_target_id.ipc.id.id_nr = inode->i_ino;
 	rsbac_new_target_id.dummy = 0;
 	rsbac_attribute_value.dummy = 0;
 	if (unlikely(rsbac_adf_set_attr(R_CREATE,
