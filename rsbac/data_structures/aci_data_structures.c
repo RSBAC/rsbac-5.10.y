@@ -673,14 +673,14 @@ static int ipc_compare(void *desc1, void *desc2)
 	struct rsbac_ipc_t *i_desc1 = desc1;
 	struct rsbac_ipc_t *i_desc2 = desc2;
 
-	result = memcmp(&i_desc1->type,
-			&i_desc2->type, sizeof(i_desc1->type));
+	result = memcmp(&i_desc1->id.id_nr,
+			&i_desc2->id.id_nr,
+			sizeof(i_desc1->id.id_nr));
 	if (result)
 		return result;
 	else
-		return memcmp(&i_desc1->id.id_nr,
-			      &i_desc2->id.id_nr,
-			      sizeof(i_desc1->id.id_nr));
+		return memcmp(&i_desc1->type,
+				&i_desc2->type, sizeof(i_desc1->type));
 }
 #endif
 
