@@ -1748,7 +1748,7 @@ static const char *pick_link(struct nameidata *nd, struct path *link,
 
 #ifdef CONFIG_RSBAC_SYM_REDIR
 	if (link->dentry->d_inode && S_ISLNK(link->dentry->d_inode->i_mode)) {
-		rsbac_name = rsbac_symlink_redirect(link->dentry->d_inode, res, PATH_MAX, FALSE);
+		rsbac_name = rsbac_symlink_redirect(link->dentry->d_inode, res, FALSE);
 		if (rsbac_name)
 			res = rsbac_name;
 	}
@@ -5503,9 +5503,11 @@ int rsbac_readlink_copy(char __user *buffer, int buflen, const char *link, struc
 	if (len > (unsigned) buflen)
 		len = buflen;
 
-	rsbac_name = rsbac_symlink_redirect(inode, link, buflen, TRUE);
+	rsbac_name = rsbac_symlink_redirect(inode, link, TRUE);
 	if (rsbac_name) {
 		len = strlen(rsbac_name);
+		if (len > (unsigned) buflen)
+			len = buflen;
 		if (copy_to_user(buffer, rsbac_name, len))
 			len = -EFAULT;
 		kfree(rsbac_name);
