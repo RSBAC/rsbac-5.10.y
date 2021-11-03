@@ -5,7 +5,7 @@
 /*                                                   */
 /* Author and (c) 1999-2021: Amon Ott <ao@rsbac.org> */
 /*                                                   */
-/* Last modified: 05/Oct/2021                        */
+/* Last modified: 03/Nov/2021                        */
 /*************************************************** */
 
 #include <linux/string.h>
@@ -2772,14 +2772,13 @@ EXPORT_SYMBOL(rsbac_symlink_redirect);
 char * rsbac_symlink_redirect(
   struct inode * inode_p,
   const char * name,
-  u_int maxlen,
   rsbac_boolean_t may_sleep)
   {
 #if defined(CONFIG_RSBAC_SYM_REDIR_REMOTE_IP) || defined(CONFIG_RSBAC_SYM_REDIR_MAC) || defined(CONFIG_RSBAC_SYM_REDIR_RC) || defined(CONFIG_RSBAC_SYM_REDIR_UID)
     union rsbac_target_id_t i_tid;
     int err;
     union rsbac_attribute_value_t i_attr_val;
-    gfp_t kmalloc_gfp = may_sleep ? GFP_KERNEL : GFP_ATOMIC;
+    const gfp_t kmalloc_gfp = may_sleep ? GFP_KERNEL : GFP_ATOMIC;
 #endif
 
     if(unlikely(!name))
@@ -2865,19 +2864,11 @@ char * rsbac_symlink_redirect(
           len--;
 
 #endif
-        if(len > (maxlen - 20))
-          {
-            rsbac_printk(KERN_DEBUG
-               "rsbac_symlink_redirect(): not enough space for symlink inode %lu on dev %02u:%02u!\n",
-               inode_p->i_ino,
-               RSBAC_MAJOR(inode_p->i_sb->s_dev), RSBAC_MINOR(inode_p->i_sb->s_dev) );
-            return NULL;
-          }
         new_name = kmalloc(len + 20, kmalloc_gfp);
         if(!new_name)
           {
             rsbac_printk(KERN_DEBUG
-               "rsbac_symlink_redirect(): not enough memory for symlink redir remote ip inode %lu on dev %02u:%02u!\n",
+               "rsbac_symlink_redirect(): cannot allocate memory for symlink redir remote ip inode %lu on dev %02u:%02u!\n",
                inode_p->i_ino,
                RSBAC_MAJOR(inode_p->i_sb->s_dev), RSBAC_MINOR(inode_p->i_sb->s_dev) );
             return NULL;
@@ -2947,19 +2938,11 @@ char * rsbac_symlink_redirect(
                      )
                  )
               len--;
-            if(len > (maxlen - room))
-              {
-                rsbac_printk(KERN_DEBUG
-                   "rsbac_symlink_redirect(): not enough space for symlink inode %lu on dev %02u:%02u!\n",
-                   inode_p->i_ino,
-                   RSBAC_MAJOR(inode_p->i_sb->s_dev), RSBAC_MINOR(inode_p->i_sb->s_dev) );
-                return NULL;
-              }
             new_name = kmalloc(len + room, kmalloc_gfp);
             if(!new_name)
               {
                 rsbac_printk(KERN_DEBUG
-                   "rsbac_symlink_redirect(): not enough memory for symlink redir uid inode %lu on dev %02u:%02u!\n",
+                   "rsbac_symlink_redirect(): cannot allocate memory for symlink redir uid inode %lu on dev %02u:%02u!\n",
                    inode_p->i_ino,
                    RSBAC_MAJOR(inode_p->i_sb->s_dev), RSBAC_MINOR(inode_p->i_sb->s_dev) );
                 return NULL;
@@ -3018,18 +3001,6 @@ char * rsbac_symlink_redirect(
                  )
              )
           len--;
-#ifdef CONFIG_RSBAC_SYM_REDIR_MAC_CAT
-        if(len > (maxlen - 85))
-#else
-        if(len > (maxlen - 20))
-#endif
-          {
-            rsbac_printk(KERN_DEBUG
-               "rsbac_symlink_redirect(): not enough space for symlink inode %lu on dev %02u:%02u!\n",
-               inode_p->i_ino,
-               RSBAC_MAJOR(inode_p->i_sb->s_dev), RSBAC_MINOR(inode_p->i_sb->s_dev) );
-            return NULL;
-          }
 
 #ifdef CONFIG_RSBAC_SYM_REDIR_MAC_CAT
         new_name = kmalloc(len + 85, kmalloc_gfp);
@@ -3039,7 +3010,7 @@ char * rsbac_symlink_redirect(
         if(!new_name)
           {
             rsbac_printk(KERN_DEBUG
-               "rsbac_symlink_redirect(): not enough memory for symlink redir MAC level inode %lu on dev %02u:%02u!\n",
+               "rsbac_symlink_redirect(): cannot allocate memory for symlink redir MAC level inode %lu on dev %02u:%02u!\n",
                inode_p->i_ino,
                RSBAC_MAJOR(inode_p->i_sb->s_dev), RSBAC_MINOR(inode_p->i_sb->s_dev) );
             return NULL;
@@ -3101,20 +3072,12 @@ char * rsbac_symlink_redirect(
               && (name[len-1] <= '9')
              )
           len--;
-        if(len > (maxlen - 20))
-          {
-            rsbac_printk(KERN_DEBUG
-               "rsbac_symlink_redirect(): not enough space for symlink inode %lu on dev %02u:%02u!\n",
-               inode_p->i_ino,
-               RSBAC_MAJOR(inode_p->i_sb->s_dev), RSBAC_MINOR(inode_p->i_sb->s_dev) );
-            return NULL;
-          }
 
         new_name = kmalloc(len + 20, kmalloc_gfp);
         if(!new_name)
           {
             rsbac_printk(KERN_DEBUG
-               "rsbac_symlink_redirect(): not enough memory for symlink redir RC role inode %lu on dev %02u:%02u!\n",
+               "rsbac_symlink_redirect(): cannot allocate memory for symlink redir RC role inode %lu on dev %02u:%02u!\n",
                inode_p->i_ino,
                RSBAC_MAJOR(inode_p->i_sb->s_dev), RSBAC_MINOR(inode_p->i_sb->s_dev) );
             return NULL;
