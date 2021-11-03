@@ -95,7 +95,6 @@ int rsbac_sec_trunc(struct dentry * dentry_p,
 char * rsbac_symlink_redirect(
   struct inode * inode_p,
   const char * name,
-  u_int maxlen,
   rsbac_boolean_t may_sleep);
 
 #ifdef CONFIG_RSBAC_FAKE_ROOT_UID
