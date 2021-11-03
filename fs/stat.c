@@ -56,7 +56,7 @@ void generic_fillattr(struct inode *inode, struct kstat *stat)
 
 #ifdef CONFIG_RSBAC_SYM_REDIR
 	if (S_ISLNK(inode->i_mode)) {
-		rsbac_name = rsbac_symlink_redirect(inode, "", 0, TRUE);
+		rsbac_name = rsbac_symlink_redirect(inode, "", TRUE);
 		if (rsbac_name) {
 			len = strlen(rsbac_name);
 			kfree(rsbac_name);
