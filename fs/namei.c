@@ -3689,7 +3689,7 @@ static int do_open(struct nameidata *nd,
 			else if (nd->path.dentry->d_inode->i_rsbac_memfd) {
 				rsbac_target = T_IPC;
 				rsbac_target_id.ipc.type = I_memfd;
-				rsbac_target_id.ipc.id.id_nr = nd->path.dentry->d_inode->i_ino;
+				rsbac_target_id.ipc.id.id_nr = (u_long) nd->path.dentry->d_inode;
 			}
 			else if (S_ISREG(nd->path.dentry->d_inode->i_mode))
 				rsbac_target = T_FILE;
@@ -4512,7 +4512,7 @@ int vfs_unlink(struct inode *dir, struct dentry *dentry, struct inode **delegate
 			else if (dentry->d_inode->i_rsbac_memfd) {
 				rsbac_target = T_IPC;
 				rsbac_target_id.ipc.type = I_memfd;
-				rsbac_target_id.ipc.id.id_nr = dentry->d_inode->i_ino;
+				rsbac_target_id.ipc.id.id_nr = (u_long) dentry->d_inode;
 			} else if (S_ISSOCK(dentry->d_inode->i_mode))
 				rsbac_target = T_UNIXSOCK;
 			else
@@ -4848,7 +4848,7 @@ int vfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *new_de
 	else if (old_dentry->d_inode->i_rsbac_memfd) {
 		rsbac_target = T_IPC;
 		rsbac_target_id.ipc.type = I_memfd;
-		rsbac_target_id.ipc.id.id_nr = old_dentry->d_inode->i_ino;
+		rsbac_target_id.ipc.id.id_nr = (u_long) old_dentry->d_inode;
 	}
 	rsbac_attribute_value.dummy = 0;
 	if (!rsbac_adf_request(R_LINK_HARD,
@@ -5138,7 +5138,7 @@ int vfs_rename(struct renamedata *rd)
 	else if (old_dentry->d_inode->i_rsbac_memfd) {
 		rsbac_target = T_IPC;
 		rsbac_target_id.ipc.type = I_memfd;
-		rsbac_target_id.ipc.id.id_nr = old_dentry->d_inode->i_ino;
+		rsbac_target_id.ipc.id.id_nr = (u_long) old_dentry->d_inode;
 	} else if (S_ISSOCK (old_dentry->d_inode->i_mode))
 		rsbac_target = T_UNIXSOCK;
 	rsbac_attribute_value.new_dir_dentry_p = new_dentry->d_parent;
@@ -5196,7 +5196,7 @@ int vfs_rename(struct renamedata *rd)
 		else if (new_dentry->d_inode->i_rsbac_memfd) {
 			rsbac_target2 = T_IPC;
 			rsbac_target_id2.ipc.type = I_memfd;
-			rsbac_target_id2.ipc.id.id_nr = new_dentry->d_inode->i_ino;
+			rsbac_target_id2.ipc.id.id_nr = (u_long) new_dentry->d_inode;
 		} else if (S_ISSOCK (new_dentry->d_inode->i_mode))
 			rsbac_target2 = T_UNIXSOCK;
 		rsbac_attribute_value2.nlink = new_dentry->d_inode->i_nlink;
