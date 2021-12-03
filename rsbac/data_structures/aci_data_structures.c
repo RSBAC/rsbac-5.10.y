@@ -5,7 +5,7 @@
 /* (some smaller parts copied from fs/namei.c        */
 /*  and others)                                      */
 /*                                                   */
-/* Last modified: 27/Sep/2021                        */
+/* Last modified: 03/Dec/2021                        */
 /*************************************************** */
 
 #include <linux/types.h>
@@ -206,9 +206,6 @@ static struct rsbac_rc_fd_aci_t def_rc_fd_aci = DEFAULT_RC_FD_ACI;
 #endif
 #if defined(CONFIG_RSBAC_UDF)
 static struct rsbac_udf_fd_aci_t  def_udf_root_dir_aci  = DEFAULT_UDF_ROOT_DIR_ACI;
-#if defined(CONFIG_RSBAC_UDF_CACHE)
-static rsbac_time_t rsbac_udf_ttl = CONFIG_RSBAC_UDF_TTL;
-#endif
 #endif
 
 #if defined(CONFIG_RSBAC_PROC)
@@ -6738,7 +6735,7 @@ static int rsbac_write(rsbac_boolean_t force_rehash)
 	while (write_blocked) {
 		spin_unlock(&rsbac_write_lock);
 		rsbac_pr_debug(write, "rsbac_write(): write_blocked, wait 100ms and retry\n");
-		msleep(100);
+		msleep_interruptible(100);
 		spin_lock(&rsbac_write_lock);
 	}
 	write_blocked = TRUE;
@@ -7200,7 +7197,7 @@ static int rsbac_automount(__u32 major, __u32 minor)
 	spin_lock(&rsbac_mount_lock);
 	while (rsbac_mount_pid != NULL) {
 		spin_unlock(&rsbac_mount_lock);
-		msleep(100);
+		msleep_interruptible(100);
 		spin_lock(&rsbac_mount_lock);
 	}
 	rsbac_mount_pid = task_pid(current);
@@ -7377,7 +7374,7 @@ int rsbac_mount(struct vfsmount * vfsmount_p, struct vfsmount * vfsmount_parent_
 	spin_lock(&rsbac_mount_lock);
 	while (rsbac_mount_pid != NULL) {
 		spin_unlock(&rsbac_mount_lock);
-		msleep(100);
+		msleep_interruptible(100);
 		spin_lock(&rsbac_mount_lock);
 	}
 	rsbac_mount_pid = task_pid(current);
@@ -7436,7 +7433,7 @@ int rsbac_mount(struct vfsmount * vfsmount_p, struct vfsmount * vfsmount_parent_
 				while (write_blocked) {
 					spin_unlock(&rsbac_write_lock);
 					rsbac_pr_debug(write, "rsbac_mount(): write_blocked, wait 100ms and retry\n");
-					msleep(100);
+					msleep_interruptible(100);
 					spin_lock(&rsbac_write_lock);
 				}
 				write_blocked = TRUE;
@@ -7596,7 +7593,7 @@ int rsbac_umount(struct vfsmount *vfsmount_p)
 	spin_lock(&rsbac_mount_lock);
 	while (rsbac_mount_pid != NULL) {
 		spin_unlock(&rsbac_mount_lock);
-		msleep(100);
+		msleep_interruptible(100);
 		spin_lock(&rsbac_mount_lock);
 	}
 	rsbac_mount_pid = task_pid(current);
@@ -10916,12 +10913,13 @@ int rsbac_get_all_res_limits(
 #endif /* CONFIG_RSBAC_RES */
 /************************************************************************** */
 
-static int set_attr_fd(rsbac_list_ta_number_t ta_number,
+static int set_attr_fd_ttl(rsbac_list_ta_number_t ta_number,
 		       enum rsbac_switch_target_t module,
 		       enum rsbac_target_t target,
 		       union rsbac_target_id_t *tid_p,
 		       enum rsbac_attribute_t attr,
-		       union rsbac_attribute_value_t *value_p)
+		       union rsbac_attribute_value_t *value_p,
+		       rsbac_time_t ttl)
 {
 	int err = 0;
 	struct rsbac_device_list_item_t *device_p;
@@ -11030,7 +11028,7 @@ static int set_attr_fd(rsbac_list_ta_number_t ta_number,
 			if (!err) {
 				err = rsbac_ta_list_add_ttl(ta_number,
 							    device_p->handles.gen,
-							    0,
+							    ttl,
 							    device_p->persist ? (void *)&inode_nr : &tid_p->file.inode,
 							    &aci);
 #ifdef CONFIG_RSBAC_FD_CACHE
@@ -11089,7 +11087,7 @@ static int set_attr_fd(rsbac_list_ta_number_t ta_number,
 			if (!err) {
 				err = rsbac_ta_list_add_ttl(ta_number,
 							device_p->handles.mac,
-							0,
+							ttl,
 							device_p->persist ? (void *)&inode_nr : &tid_p->file.inode,
 							&aci);
 #ifdef CONFIG_RSBAC_FD_CACHE
@@ -11108,7 +11106,7 @@ static int set_attr_fd(rsbac_list_ta_number_t ta_number,
 				err = rsbac_ta_list_add_ttl(ta_number,
 							device_p->
 							handles.ff,
-							0,
+							ttl,
 							device_p->persist ? (void *)&inode_nr : &tid_p->file.inode,
 							&value_p->ff_flags);
 #ifdef CONFIG_RSBAC_FD_CACHE
@@ -11169,7 +11167,7 @@ static int set_attr_fd(rsbac_list_ta_number_t ta_number,
 			if (need_set) {
 				err = rsbac_ta_list_add_ttl(ta_number,
 							device_p->handles.rc,
-							0,
+							ttl,
 							device_p->persist ? (void *)&inode_nr : &tid_p->file.inode,
 							&aci);
 			}
@@ -11213,7 +11211,7 @@ static int set_attr_fd(rsbac_list_ta_number_t ta_number,
 			if (need_set) {
 				err = rsbac_ta_list_add_ttl(ta_number,
 							device_p->handles.auth,
-							0,
+							ttl,
 							device_p->persist ? (void *)&inode_nr : &tid_p->file.inode,
 							&aci);
 			}
@@ -11262,7 +11260,7 @@ static int set_attr_fd(rsbac_list_ta_number_t ta_number,
 			if (need_set) {
 				err = rsbac_ta_list_add_ttl(ta_number,
 							    device_p->handles.cap,
-							    0,
+							    ttl,
 							    device_p->persist ? (void *)&inode_nr : &tid_p->file.inode,
 							    &aci);
 			}
@@ -11327,7 +11325,7 @@ static int set_attr_fd(rsbac_list_ta_number_t ta_number,
 #if defined(CONFIG_RSBAC_UDF_CACHE)
 			if (attr == A_udf_checked) {
 				err = rsbac_list_add_ttl(device_p->handles.udfc,
-						       rsbac_udf_ttl,
+						       ttl,
 #ifdef CONFIG_RSBAC_UDF_PERSIST
 						       device_p->persist ? (void *)&inode_nr : &tid_p->file.inode,
 #else
@@ -11369,7 +11367,7 @@ static int set_attr_fd(rsbac_list_ta_number_t ta_number,
 					err = rsbac_ta_list_add_ttl
 						(ta_number,
 						device_p->handles.udf,
-						0,
+						ttl,
 						device_p->persist ? (void *)&inode_nr : &tid_p->file.inode,
 						&aci);
 				}
@@ -11434,12 +11432,13 @@ static int set_attr_fd(rsbac_list_ta_number_t ta_number,
 	return err;
 }
 
-static int set_attr_dev(rsbac_list_ta_number_t ta_number,
+static int set_attr_dev_ttl(rsbac_list_ta_number_t ta_number,
 			enum rsbac_switch_target_t module,
 			enum rsbac_target_t target,
 			struct rsbac_dev_desc_t dev,
 			enum rsbac_attribute_t attr,
-			union rsbac_attribute_value_t *value_p)
+			union rsbac_attribute_value_t *value_p,
+			rsbac_time_t ttl)
 {
 	int err = 0;
 	/* rsbac_pr_debug(ds, "Setting dev attribute\n"); */
@@ -11467,8 +11466,9 @@ static int set_attr_dev(rsbac_list_ta_number_t ta_number,
 			}
 			if (!err) {
 				err = rsbac_ta_list_add_ttl(ta_number,
-							    dev_handles.
-							    gen, 0, &dev,
+							    dev_handles.gen,
+							    ttl,
+							    &dev,
 							    &aci);
 			}
 		}
@@ -11501,8 +11501,9 @@ static int set_attr_dev(rsbac_list_ta_number_t ta_number,
 			}
 			if (!err) {
 				err = rsbac_ta_list_add_ttl(ta_number,
-							    dev_handles.
-							    mac, 0, &dev,
+							    dev_handles.mac,
+							    ttl,
+							    &dev,
 							    &aci);
 			}
 		}
@@ -11549,7 +11550,7 @@ static int set_attr_dev(rsbac_list_ta_number_t ta_number,
 			case A_rc_type:
 				err = rsbac_ta_list_add_ttl(ta_number,
 							    handle,
-							    0,
+							    ttl,
 							    &dev_desc,
 							    &type);
 				break;
@@ -11567,12 +11568,13 @@ static int set_attr_dev(rsbac_list_ta_number_t ta_number,
 	return err;
 }
 
-static int set_attr_ipc(rsbac_list_ta_number_t ta_number,
+static int set_attr_ipc_ttl(rsbac_list_ta_number_t ta_number,
 			enum rsbac_switch_target_t module,
 			enum rsbac_target_t target,
 			union rsbac_target_id_t *tid_p,
 			enum rsbac_attribute_t attr,
-			union rsbac_attribute_value_t *value_p)
+			union rsbac_attribute_value_t *value_p,
+			rsbac_time_t ttl)
 {
 	int err = 0;
 	/* rsbac_pr_debug(ds, "Setting ipc attribute"); */
@@ -11600,8 +11602,8 @@ static int set_attr_ipc(rsbac_list_ta_number_t ta_number,
 			}
 			if (!err) {
 				err = rsbac_ta_list_add_ttl(ta_number,
-							    ipc_handles.
-							    mac, 0,
+							    ipc_handles.mac,
+							    ttl,
 							    &tid_p->ipc,
 							    &aci);
 			}
@@ -11618,7 +11620,7 @@ static int set_attr_ipc(rsbac_list_ta_number_t ta_number,
 			case A_rc_type:
 				err = rsbac_ta_list_add_ttl(ta_number,
 							    ipc_handles.rc,
-							    0,
+							    ttl,
 							    &tid_p->ipc,
 							    &type);
 				break;
@@ -11636,17 +11638,9 @@ static int set_attr_ipc(rsbac_list_ta_number_t ta_number,
 
 			switch (attr) {
 			case A_jail_id:
-/*				if (id)
-					rsbac_pr_debug(aef,
-						       "Setting jail_id for IPC "
-						       "%s %lu to %u\n",
-						       get_ipc_target_name(tmp,
-						       			   tid_p->ipc.type),
-						       tid_p->ipc.id.id_nr,
-						       id); */
 				err = rsbac_ta_list_add_ttl(ta_number,
-							    ipc_handles.
-							    jail, 0,
+							    ipc_handles.jail,
+							    ttl,
 							    &tid_p->ipc,
 							    &id);
 				break;
@@ -11664,12 +11658,13 @@ static int set_attr_ipc(rsbac_list_ta_number_t ta_number,
 	return err;
 }
 
-static int set_attr_user(rsbac_list_ta_number_t ta_number,
+static int set_attr_user_ttl(rsbac_list_ta_number_t ta_number,
 			 enum rsbac_switch_target_t module,
 			 enum rsbac_target_t target,
 			 union rsbac_target_id_t *tid_p,
 			 enum rsbac_attribute_t attr,
-			 union rsbac_attribute_value_t *value_p)
+			 union rsbac_attribute_value_t *value_p,
+			 rsbac_time_t ttl)
 {
 	int err = 0;
 	/* rsbac_pr_debug(ds, "Setting %s user attribute %i "
@@ -11699,8 +11694,8 @@ static int set_attr_user(rsbac_list_ta_number_t ta_number,
 			}
 			if (!err) {
 				err = rsbac_ta_list_add_ttl(ta_number,
-							    user_handles.
-							    gen, 0,
+							    user_handles.gen,
+							    ttl,
 							    &tid_p->user,
 							    &aci);
 			}
@@ -11791,8 +11786,8 @@ static int set_attr_user(rsbac_list_ta_number_t ta_number,
 			}
 			if (!err) {
 				err = rsbac_ta_list_add_ttl(ta_number,
-							    user_handles.
-							    mac, 0,
+							    user_handles.mac,
+							    ttl,
 							    &tid_p->user,
 							    &aci);
 			}
@@ -11810,8 +11805,8 @@ static int set_attr_user(rsbac_list_ta_number_t ta_number,
 			case A_system_role:
 			case A_ff_role:
 				err = rsbac_ta_list_add_ttl(ta_number,
-							    user_handles.
-							    ff, 0,
+							    user_handles.ff,
+							    ttl,
 							    &tid_p->user,
 							    &role);
 				break;
@@ -11843,8 +11838,8 @@ static int set_attr_user(rsbac_list_ta_number_t ta_number,
 			}
 			if (!err) {
 				err = rsbac_ta_list_add_ttl(ta_number,
-							    user_handles.
-							    rc, 0,
+							    user_handles.rc,
+							    ttl,
 							    &tid_p->user,
 							    &aci);
 			}
@@ -11862,8 +11857,8 @@ static int set_attr_user(rsbac_list_ta_number_t ta_number,
 			case A_system_role:
 			case A_auth_role:
 				err = rsbac_ta_list_add_ttl(ta_number,
-							    user_handles.
-							    auth, 0,
+							    user_handles.auth,
+							    ttl,
 							    &tid_p->user,
 							    &role);
 				break;
@@ -11905,8 +11900,8 @@ static int set_attr_user(rsbac_list_ta_number_t ta_number,
 			}
 			if (!err) {
 				err = rsbac_ta_list_add_ttl(ta_number,
-							    user_handles.
-							    cap, 0,
+							    user_handles.cap,
+							    ttl,
 							    &tid_p->user,
 							    &aci);
 			}
@@ -11925,7 +11920,7 @@ static int set_attr_user(rsbac_list_ta_number_t ta_number,
 			case A_jail_role:
 				err = rsbac_ta_list_add_ttl(ta_number,
 							    user_handles.jail,
-							    0,
+							    ttl,
 							    &tid_p->user,
 							    &role);
 				break;
@@ -11999,8 +11994,8 @@ static int set_attr_user(rsbac_list_ta_number_t ta_number,
 			case A_system_role:
 			case A_udf_role:
 				err = rsbac_ta_list_add_ttl(ta_number,
-							    user_handles.
-							    udf, 0,
+							    user_handles.udf,
+							    ttl,
 							    &tid_p->user,
 							    &role);
 				break;
@@ -12018,12 +12013,13 @@ static int set_attr_user(rsbac_list_ta_number_t ta_number,
 	return err;
 }
 
-static int set_attr_process(rsbac_list_ta_number_t ta_number,
+static int set_attr_process_ttl(rsbac_list_ta_number_t ta_number,
 			    enum rsbac_switch_target_t module,
 			    enum rsbac_target_t target,
 			    union rsbac_target_id_t *tid_p,
 			    enum rsbac_attribute_t attr,
-			    union rsbac_attribute_value_t *value_p)
+			    union rsbac_attribute_value_t *value_p,
+			    rsbac_time_t ttl)
 {
 	int err = 0;
 	/* rsbac_pr_debug(ds, "Setting process attribute\n"); */
@@ -12075,7 +12071,7 @@ static int set_attr_process(rsbac_list_ta_number_t ta_number,
 			if (!err) {
 				err = rsbac_ta_list_add_ttl(ta_number,
 							    process_handles.gen,
-							    0,
+							    ttl,
 							    &tid_p->
 							    process, &aci);
 			}
@@ -12157,7 +12153,7 @@ static int set_attr_process(rsbac_list_ta_number_t ta_number,
 			if (!err) {
 				err = rsbac_ta_list_add_ttl(ta_number,
 							    process_handles.mac,
-							    0,
+							    ttl,
 							    &tid_p->
 							    process, &aci);
 			}
@@ -12194,7 +12190,7 @@ static int set_attr_process(rsbac_list_ta_number_t ta_number,
 			if (!err) {
 				err = rsbac_ta_list_add_ttl(ta_number,
 							    process_handles.rc,
-							    0,
+							    ttl,
 							    &tid_p->
 							    process, &aci);
 			}
@@ -12258,7 +12254,7 @@ static int set_attr_process(rsbac_list_ta_number_t ta_number,
 			if (!err) {
 				err = rsbac_ta_list_add_ttl(ta_number,
 							    process_handles.auth,
-							    0,
+							    ttl,
 							    &tid_p->process,
 							    &aci);
 			}
@@ -12299,10 +12295,10 @@ static int set_attr_process(rsbac_list_ta_number_t ta_number,
 			}
 			if (!err) {
 				err = rsbac_ta_list_add_ttl(ta_number,
-							    process_handles.
-							    cap, 0,
-							    &tid_p->
-							    process, &aci);
+							    process_handles.cap,
+							    ttl,
+							    &tid_p->process,
+							    &aci);
 			}
 		}
 		break;
@@ -12347,9 +12343,9 @@ static int set_attr_process(rsbac_list_ta_number_t ta_number,
 			if (!err) {
 				err = rsbac_ta_list_add_ttl(ta_number,
 							    process_handles.jail,
-							    0,
-							    &tid_p->
-							    process, &aci);
+							    ttl,
+							    &tid_p->process,
+							    &aci);
 			}
 		}
 		break;
@@ -12374,10 +12370,10 @@ static int set_attr_process(rsbac_list_ta_number_t ta_number,
 			}
 			if (!err) {
 				err = rsbac_ta_list_add_ttl(ta_number,
-							    process_handles.
-							    udf, 0,
-							    &tid_p->
-							    process, &aci);
+							    process_handles.udf,
+							    ttl,
+							    &tid_p->process,
+							    &aci);
 			}
 		}
 		break;
@@ -12391,12 +12387,13 @@ static int set_attr_process(rsbac_list_ta_number_t ta_number,
 }
 
 #ifdef CONFIG_RSBAC_UM
-static int set_attr_group(rsbac_list_ta_number_t ta_number,
+static int set_attr_group_ttl(rsbac_list_ta_number_t ta_number,
 			  enum rsbac_switch_target_t module,
 			  enum rsbac_target_t target,
 			  union rsbac_target_id_t *tid_p,
 			  enum rsbac_attribute_t attr,
-			  union rsbac_attribute_value_t *value_p)
+			  union rsbac_attribute_value_t *value_p,
+			  rsbac_time_t ttl)
 {
 	int err = 0;
 	/* rsbac_pr_debug(ds, "Setting group attribute\n"); */
@@ -12412,8 +12409,8 @@ static int set_attr_group(rsbac_list_ta_number_t ta_number,
 			switch (attr) {
 			case A_rc_type:
 				err = rsbac_ta_list_add_ttl(ta_number,
-							    group_handles.
-							    rc, 0,
+							    group_handles.rc,
+							    ttl,
 							    &group_desc,
 							    &type);
 				break;
@@ -12433,12 +12430,13 @@ static int set_attr_group(rsbac_list_ta_number_t ta_number,
 #endif				/* UM */
 
 #ifdef CONFIG_RSBAC_NET_DEV
-static int set_attr_netdev(rsbac_list_ta_number_t ta_number,
+static int set_attr_netdev_ttl(rsbac_list_ta_number_t ta_number,
 			   enum rsbac_switch_target_t module,
 			   enum rsbac_target_t target,
 			   union rsbac_target_id_t *tid_p,
 			   enum rsbac_attribute_t attr,
-			   union rsbac_attribute_value_t *value_p)
+			   union rsbac_attribute_value_t *value_p,
+			   rsbac_time_t ttl)
 {
 	int err = 0;
 	/* rsbac_pr_debug(ds, "Setting netdev attribute\n"); */
@@ -12466,8 +12464,8 @@ static int set_attr_netdev(rsbac_list_ta_number_t ta_number,
 			}
 			if (!err) {
 				err = rsbac_ta_list_add_ttl(ta_number,
-							    netdev_handles.
-							    gen, 0,
+							    netdev_handles.gen,
+							    ttl,
 							    &tid_p->netdev,
 							    &aci);
 			}
@@ -12482,8 +12480,8 @@ static int set_attr_netdev(rsbac_list_ta_number_t ta_number,
 			switch (attr) {
 			case A_rc_type:
 				err = rsbac_ta_list_add_ttl(ta_number,
-							    netdev_handles.
-							    rc, 0,
+							    netdev_handles.rc,
+							    ttl,
 							    &tid_p->netdev,
 							    &type);
 				break;
@@ -12503,12 +12501,13 @@ static int set_attr_netdev(rsbac_list_ta_number_t ta_number,
 #endif
 
 #ifdef CONFIG_RSBAC_NET_OBJ
-static int set_attr_nettemp(rsbac_list_ta_number_t ta_number,
+static int set_attr_nettemp_ttl(rsbac_list_ta_number_t ta_number,
 			    enum rsbac_switch_target_t module,
 			    enum rsbac_target_t target,
 			    union rsbac_target_id_t *tid_p,
 			    enum rsbac_attribute_t attr,
-			    union rsbac_attribute_value_t *value_p)
+			    union rsbac_attribute_value_t *value_p,
+			    rsbac_time_t ttl)
 {
 	int err = 0;
 	/* rsbac_pr_debug(ds, "Setting nettemp attribute\n"); */
@@ -12539,10 +12538,10 @@ static int set_attr_nettemp(rsbac_list_ta_number_t ta_number,
 			}
 			if (!err) {
 				err = rsbac_ta_list_add_ttl(ta_number,
-							    nettemp_handles.
-							    gen, 0,
-							    &tid_p->
-							    nettemp, &aci);
+							    nettemp_handles.gen,
+							    ttl,
+							    &tid_p->nettemp,
+							    &aci);
 			}
 		}
 		break;
@@ -12571,10 +12570,10 @@ static int set_attr_nettemp(rsbac_list_ta_number_t ta_number,
 			}
 			if (!err) {
 				err = rsbac_ta_list_add_ttl(ta_number,
-							    nettemp_handles.
-							    mac, 0,
-							    &tid_p->
-							    nettemp, &aci);
+							    nettemp_handles.mac,
+							    ttl,
+							    &tid_p->nettemp,
+							    &aci);
 			}
 		}
 		break;
@@ -12603,10 +12602,10 @@ static int set_attr_nettemp(rsbac_list_ta_number_t ta_number,
 			}
 			if (!err) {
 				err = rsbac_ta_list_add_ttl(ta_number,
-							    nettemp_handles.
-							    rc, 0,
-							    &tid_p->
-							    nettemp, &aci);
+							    nettemp_handles.rc,
+							    ttl,
+							    &tid_p->nettemp,
+							    &aci);
 			}
 		}
 		break;
@@ -12619,12 +12618,13 @@ static int set_attr_nettemp(rsbac_list_ta_number_t ta_number,
 	return err;
 }
 
-static int set_attr_netobj(rsbac_list_ta_number_t ta_number,
+static int set_attr_netobj_ttl(rsbac_list_ta_number_t ta_number,
 			   enum rsbac_switch_target_t module,
 			   enum rsbac_target_t target,
 			   union rsbac_target_id_t *tid_p,
 			   enum rsbac_attribute_t attr,
-			   union rsbac_attribute_value_t *value_p)
+			   union rsbac_attribute_value_t *value_p,
+			   rsbac_time_t ttl)
 {
 	int err = 0;
 	/* rsbac_pr_debug(ds, "Setting netobj attribute\n"); */
@@ -12676,40 +12676,36 @@ static int set_attr_netobj(rsbac_list_ta_number_t ta_number,
 			{
 				switch (attr) {
 				case A_local_sec_level:
-					aci.sec_level =
-					    value_p->security_level;
-					err =
-					    rsbac_ta_list_add_ttl
-					    (ta_number,
-					     lnetobj_handles.mac, 0,
-					     &tid_p->netobj.sock_p, &aci);
+					aci.sec_level = value_p->security_level;
+					err = rsbac_ta_list_add_ttl(ta_number,
+								lnetobj_handles.mac,
+								ttl,
+								&tid_p->netobj.sock_p,
+								&aci);
 					break;
 				case A_remote_sec_level:
-					aci.sec_level =
-					    value_p->security_level;
-					err =
-					    rsbac_ta_list_add_ttl
-					    (ta_number,
-					     rnetobj_handles.mac, 0,
-					     &tid_p->netobj.sock_p, &aci);
+					aci.sec_level = value_p->security_level;
+					err = rsbac_ta_list_add_ttl(ta_number,
+								rnetobj_handles.mac,
+								ttl,
+								&tid_p->netobj.sock_p,
+								&aci);
 					break;
 				case A_local_mac_categories:
-					aci.mac_categories =
-					    value_p->mac_categories;
-					err =
-					    rsbac_ta_list_add_ttl
-					    (ta_number,
-					     lnetobj_handles.mac, 0,
-					     &tid_p->netobj.sock_p, &aci);
+					aci.mac_categories = value_p->mac_categories;
+					err = rsbac_ta_list_add_ttl(ta_number,
+								lnetobj_handles.mac,
+								ttl,
+								&tid_p->netobj.sock_p,
+								&aci);
 					break;
 				case A_remote_mac_categories:
-					aci.mac_categories =
-					    value_p->mac_categories;
-					err =
-					    rsbac_ta_list_add_ttl
-					    (ta_number,
-					     rnetobj_handles.mac, 0,
-					     &tid_p->netobj.sock_p, &aci);
+					aci.mac_categories = value_p->mac_categories;
+					err = rsbac_ta_list_add_ttl(ta_number,
+								rnetobj_handles.mac,
+								ttl,
+								&tid_p->netobj.sock_p,
+								&aci);
 					break;
 
 				default:
@@ -12728,14 +12724,16 @@ static int set_attr_netobj(rsbac_list_ta_number_t ta_number,
 			switch (attr) {
 			case A_local_rc_type:
 				err = rsbac_ta_list_add_ttl(ta_number,
-							    lnetobj_handles.rc, 0,
+							    lnetobj_handles.rc,
+							    ttl,
 							    &tid_p->netobj.
 							    sock_p, &type);
 				break;
 
 			case A_remote_rc_type:
 				err = rsbac_ta_list_add_ttl(ta_number,
-							    rnetobj_handles.rc, 0,
+							    rnetobj_handles.rc,
+							    ttl,
 							    &tid_p->netobj.
 							    sock_p, &type);
 				break;
@@ -12756,12 +12754,13 @@ static int set_attr_netobj(rsbac_list_ta_number_t ta_number,
 #endif				/* UM */
 
 
-int rsbac_ta_set_attr(rsbac_list_ta_number_t ta_number,
+int rsbac_ta_set_attr_ttl(rsbac_list_ta_number_t ta_number,
 		      enum rsbac_switch_target_t module,
 		      enum rsbac_target_t target,
 		      union rsbac_target_id_t tid,
 		      enum rsbac_attribute_t attr,
-		      union rsbac_attribute_value_t value)
+		      union rsbac_attribute_value_t value,
+		      rsbac_time_t ttl)
 {
 	int err = 0;
 /*
@@ -12784,60 +12783,44 @@ int rsbac_ta_set_attr(rsbac_list_ta_number_t ta_number,
 	case T_FIFO:
 	case T_SYMLINK:
 	case T_UNIXSOCK:
-		err = set_attr_fd(ta_number, module, target, &tid, attr, &value);
+		err = set_attr_fd_ttl(ta_number, module, target, &tid, attr, &value, ttl);
 		break;
 
 	case T_DEV:
-		err =
-		    set_attr_dev(ta_number, module, target, tid.dev, attr,
-				 &value);
+		err = set_attr_dev_ttl(ta_number, module, target, tid.dev, attr, &value, ttl);
 		break;
 
 	case T_IPC:
-		err =
-		    set_attr_ipc(ta_number, module, target, &tid, attr,
-				 &value);
+		err = set_attr_ipc_ttl(ta_number, module, target, &tid, attr, &value, ttl);
 		break;
 
 	case T_USER:
-		err =
-		    set_attr_user(ta_number, module, target, &tid, attr,
-				  &value);
+		err = set_attr_user_ttl(ta_number, module, target, &tid, attr, &value, ttl);
 		break;
 
 	case T_PROCESS:
-		err =
-		    set_attr_process(ta_number, module, target, &tid, attr,
-				     &value);
+		err = set_attr_process_ttl(ta_number, module, target, &tid, attr, &value, ttl);
 		break;
 
 #ifdef CONFIG_RSBAC_UM
 	case T_GROUP:
-		err =
-		    set_attr_group(ta_number, module, target, &tid, attr,
-				   &value);
+		err = set_attr_group_ttl(ta_number, module, target, &tid, attr, &value, ttl);
 		break;
 #endif				/* CONFIG_RSBAC_UM */
 
 #ifdef CONFIG_RSBAC_NET_DEV
 	case T_NETDEV:
-		err =
-		    set_attr_netdev(ta_number, module, target, &tid, attr,
-				    &value);
+		err = set_attr_netdev_ttl(ta_number, module, target, &tid, attr, &value, ttl);
 		break;
 #endif
 
 #ifdef CONFIG_RSBAC_NET_OBJ
 	case T_NETTEMP:
-		err =
-		    set_attr_nettemp(ta_number, module, target, &tid, attr,
-				     &value);
+		err = set_attr_nettemp_ttl(ta_number, module, target, &tid, attr, &value, ttl);
 		break;
 
 	case T_NETOBJ:
-		err =
-		    set_attr_netobj(ta_number, module, target, &tid, attr,
-				    &value);
+		err = set_attr_netobj_ttl(ta_number, module, target, &tid, attr, &value, ttl);
 		break;
 #endif				/* NET_OBJ */
 
@@ -14264,29 +14247,6 @@ rsbac_boolean_t rsbac_jail_exists(rsbac_jail_id_t jail_id)
 #endif
 
 #if defined(CONFIG_RSBAC_UDF)
-EXPORT_SYMBOL(rsbac_udf_get_ttl);
-/* Get ttl for new cache items in seconds */
-rsbac_time_t rsbac_udf_get_ttl(void)
-{
-#if defined(CONFIG_RSBAC_UDF_CACHE)
-	return rsbac_udf_ttl;
-#else
-	return 0;
-#endif
-}
-
-EXPORT_SYMBOL(rsbac_udf_set_ttl);
-void rsbac_udf_set_ttl(rsbac_time_t ttl)
-{
-#if defined(CONFIG_RSBAC_UDF_CACHE)
-	if (ttl) {
-		if (ttl > RSBAC_LIST_MAX_AGE_LIMIT)
-			ttl = RSBAC_LIST_MAX_AGE_LIMIT;
-		rsbac_udf_ttl = ttl;
-	}
-#endif
-}
-
 EXPORT_SYMBOL(rsbac_udf_flush_cache);
 int rsbac_udf_flush_cache(void)
 {
