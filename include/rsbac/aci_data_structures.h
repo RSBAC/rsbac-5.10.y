@@ -1,8 +1,8 @@
 /**************************************/
 /* Rule Set Based Access Control      */
-/* Author and (c) 1999-2021: Amon Ott */
+/* Author and (c) 1999-2023: Amon Ott */
 /* Data structures                    */
-/* Last modified: 04/Oct/2021         */
+/* Last modified: 05/Jan/2023         */
 /**************************************/
 
 #ifndef __RSBAC_DATA_STRUC_H
@@ -1419,8 +1419,9 @@ extern __u32 rsbac_root_dev_minor;
 
 long rsbac_read_open(char *name, __u32 major, __u32 minor);
 
-extern int do_renameat2(int olddfd, const char __user *oldname, int newdfd,
-                        const char __user *newname, unsigned int flags);
+int do_renameat2(int olddfd, struct filename *oldname, int newdfd,
+		struct filename *newname, unsigned int flags);
+
 long rsbac_write_open(char * name, __u32 major, __u32 minor);
 
 void rsbac_read_close(unsigned int fd);
