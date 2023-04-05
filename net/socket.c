@@ -2279,8 +2279,6 @@ struct file *do_accept(struct file *file, unsigned file_flags,
 			goto out_fd;
 	}
 
-	/* File flags are not inherited via accept() unlike another OSes. */
-	return newfile;
 #ifdef CONFIG_RSBAC
 	if (rsbac_target != T_NONE) {
 		rsbac_new_target_id.dummy = 0;
@@ -2299,7 +2297,16 @@ struct file *do_accept(struct file *file, unsigned file_flags,
 		put_pid(rsbac_attribute_value.process);
 #endif
 
+	/* File flags are not inherited via accept() unlike another OSes. */
+	return newfile;
+
 out_fd:
+
+#ifdef CONFIG_RSBAC
+	if (rsbac_attribute == A_process)
+		put_pid(rsbac_attribute_value.process);
+#endif
+
 	fput(newfile);
 	return ERR_PTR(err);
 }
