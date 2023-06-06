@@ -1004,6 +1004,25 @@ long __sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
 
 	old = current_cred();
 
+#ifndef CONFIG_RSBAC
+	/* check for no-op */
+	if ((ruid == (uid_t) -1 || uid_eq(kruid, old->uid)) &&
+	    (euid == (uid_t) -1 || (uid_eq(keuid, old->euid) &&
+				    uid_eq(keuid, old->fsuid))) &&
+	    (suid == (uid_t) -1 || uid_eq(ksuid, old->suid)))
+		return 0;
+#endif
+
+	ruid_new = ruid != (uid_t) -1        && !uid_eq(kruid, old->uid) &&
+		   !uid_eq(kruid, old->euid) && !uid_eq(kruid, old->suid);
+	euid_new = euid != (uid_t) -1        && !uid_eq(keuid, old->uid) &&
+		   !uid_eq(keuid, old->euid) && !uid_eq(keuid, old->suid);
+	suid_new = suid != (uid_t) -1        && !uid_eq(ksuid, old->uid) &&
+		   !uid_eq(ksuid, old->euid) && !uid_eq(ksuid, old->suid);
+	if ((ruid_new || euid_new || suid_new) &&
+	    !ns_capable_setid(old->user_ns, CAP_SETUID))
+		return -EPERM;
+
 #ifdef CONFIG_RSBAC
 	rsbac_old_uid = __kuid_val(old->uid);
 	rsbac_target_id.process = task_pid(current);
@@ -1045,23 +1064,6 @@ long __sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
 	}
 #endif
 #endif
-
-	/* check for no-op */
-	if ((ruid == (uid_t) -1 || uid_eq(kruid, old->uid)) &&
-	    (euid == (uid_t) -1 || (uid_eq(keuid, old->euid) &&
-				    uid_eq(keuid, old->fsuid))) &&
-	    (suid == (uid_t) -1 || uid_eq(ksuid, old->suid)))
-		return 0;
-
-	ruid_new = ruid != (uid_t) -1        && !uid_eq(kruid, old->uid) &&
-		   !uid_eq(kruid, old->euid) && !uid_eq(kruid, old->suid);
-	euid_new = euid != (uid_t) -1        && !uid_eq(keuid, old->uid) &&
-		   !uid_eq(keuid, old->euid) && !uid_eq(keuid, old->suid);
-	suid_new = suid != (uid_t) -1        && !uid_eq(ksuid, old->uid) &&
-		   !uid_eq(ksuid, old->euid) && !uid_eq(ksuid, old->suid);
-	if ((ruid_new || euid_new || suid_new) &&
-	    !ns_capable_setid(old->user_ns, CAP_SETUID))
-		return -EPERM;
 
 	new = prepare_creds();
 	if (!new)
@@ -1197,6 +1199,25 @@ long __sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid)
 
 	old = current_cred();
 
+#ifndef CONFIG_RSBAC
+	/* check for no-op */
+	if ((rgid == (gid_t) -1 || gid_eq(krgid, old->gid)) &&
+	    (egid == (gid_t) -1 || (gid_eq(kegid, old->egid) &&
+				    gid_eq(kegid, old->fsgid))) &&
+	    (sgid == (gid_t) -1 || gid_eq(ksgid, old->sgid)))
+		return 0;
+#endif
+
+	rgid_new = rgid != (gid_t) -1        && !gid_eq(krgid, old->gid) &&
+		   !gid_eq(krgid, old->egid) && !gid_eq(krgid, old->sgid);
+	egid_new = egid != (gid_t) -1        && !gid_eq(kegid, old->gid) &&
+		   !gid_eq(kegid, old->egid) && !gid_eq(kegid, old->sgid);
+	sgid_new = sgid != (gid_t) -1        && !gid_eq(ksgid, old->gid) &&
+		   !gid_eq(ksgid, old->egid) && !gid_eq(ksgid, old->sgid);
+	if ((rgid_new || egid_new || sgid_new) &&
+	    !ns_capable_setid(old->user_ns, CAP_SETGID))
+		return -EPERM;
+
 #ifdef CONFIG_RSBAC
 	rsbac_pr_debug(aef, "calling ADF\n");
 	rsbac_target_id.process = task_pid(current);
@@ -1230,23 +1251,6 @@ long __sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid)
 	}
 #endif
 #endif
-
-	/* check for no-op */
-	if ((rgid == (gid_t) -1 || gid_eq(krgid, old->gid)) &&
-	    (egid == (gid_t) -1 || (gid_eq(kegid, old->egid) &&
-				    gid_eq(kegid, old->fsgid))) &&
-	    (sgid == (gid_t) -1 || gid_eq(ksgid, old->sgid)))
-		return 0;
-
-	rgid_new = rgid != (gid_t) -1        && !gid_eq(krgid, old->gid) &&
-		   !gid_eq(krgid, old->egid) && !gid_eq(krgid, old->sgid);
-	egid_new = egid != (gid_t) -1        && !gid_eq(kegid, old->gid) &&
-		   !gid_eq(kegid, old->egid) && !gid_eq(kegid, old->sgid);
-	sgid_new = sgid != (gid_t) -1        && !gid_eq(ksgid, old->gid) &&
-		   !gid_eq(ksgid, old->egid) && !gid_eq(ksgid, old->sgid);
-	if ((rgid_new || egid_new || sgid_new) &&
-	    !ns_capable_setid(old->user_ns, CAP_SETGID))
-		return -EPERM;
 
 	new = prepare_creds();
 	if (!new)
