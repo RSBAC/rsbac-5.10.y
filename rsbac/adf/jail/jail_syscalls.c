@@ -4,9 +4,9 @@
 /* Facility (ADF) - JAIL module                      */
 /* File: rsbac/adf/jail/syscalls.c                   */
 /*                                                   */
-/* Author and (c) 1999-2023: Amon Ott <ao@rsbac.org> */
+/* Author and (c) 1999-2024: Amon Ott <ao@rsbac.org> */
 /*                                                   */
-/* Last modified: 01/Nov/2023                        */
+/* Last modified: 24/Jun/2024                        */
 /*************************************************** */
 
 #include <linux/string.h>
@@ -193,11 +193,11 @@ restart:
 
 		for(fd=0; fd < fdt->max_fds; fd++)
 		{
-			file = fcheck(fd);
+			file = fdt->fd[fd];
 			if(   file
-					&& file->f_path.dentry
-					&& file->f_path.dentry->d_inode
-					&& S_ISDIR(file->f_path.dentry->d_inode->i_mode)
+				&& file->f_path.dentry
+				&& file->f_path.dentry->d_inode
+				&& S_ISDIR(file->f_path.dentry->d_inode->i_mode)
 			  )
 			{
 				char * filename;
@@ -226,7 +226,7 @@ restart:
 					rsbac_kfree(filename);
 				}
 
-				ksys_close(fd);
+				filp_close(file, files);
 				goto restart;
 			}
 		}
