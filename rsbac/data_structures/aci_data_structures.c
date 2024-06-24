@@ -5,7 +5,7 @@
 /* (some smaller parts copied from fs/namei.c        */
 /*  and others)                                      */
 /*                                                   */
-/* Last modified: 12/Jan/2024                        */
+/* Last modified: 24/Jun/2024                        */
 /*************************************************** */
 
 #include <linux/types.h>
@@ -450,12 +450,11 @@ static int rsbac_set_rsbac_dat_inode(__u32 major, __u32 minor, long dir_fd)
 #define O_PATH_FLAGS            (O_DIRECTORY | O_NOFOLLOW | O_PATH | O_CLOEXEC)
 /* end of copy from fs/open.c */
 
-static int rsbac_aci_path_open(__u32 major, __u32 minor, rsbac_boolean_t create_dir)
+static int rsbac_aci_path_open(struct vfsmount *vfsmount_p, __u32 major, __u32 minor, rsbac_boolean_t create_dir)
 {
 	long root_fd = 0;
 	long dir_fd = 0;
 	struct file * f;
-	struct vfsmount *vfsmount_p;
 	struct open_how how = build_open_how(O_RDONLY, 0);
 	struct open_flags op;
 	struct path path;
@@ -465,14 +464,6 @@ static int rsbac_aci_path_open(__u32 major, __u32 minor, rsbac_boolean_t create_
 	root_fd = get_unused_fd_flags(O_RDONLY);
 	if (root_fd < 0)
 		return root_fd;
-
-	vfsmount_p = rsbac_get_vfsmount(major, minor);
-	if (!vfsmount_p) {
-		rsbac_pr_debug(ds, "device %02u:%02u has no vfsmount_p, probably auto mounted\n",
-				major, minor);
-		put_unused_fd(root_fd);
-		return -RSBAC_EINVALIDDEV;
-	}
 
 	f = file_open_root(vfsmount_p->mnt_root, vfsmount_p, "", O_PATH, 0);
 	if (IS_ERR(f)) {
@@ -486,7 +477,7 @@ static int rsbac_aci_path_open(__u32 major, __u32 minor, rsbac_boolean_t create_
 
 	dir_fd = build_open_flags(&how, &op);
 	if (dir_fd < 0) {
-		ksys_close(root_fd);
+		close_fd(root_fd);
 		rsbac_printk(KERN_WARNING "rsbac_aci_path_open(): build_open_flags() for %s dir on device %02u:%02u failed with error %li\n",
 			     RSBAC_ACI_PATH, major, minor, dir_fd);
 		return -RSBAC_ENOTFOUND;
@@ -501,14 +492,14 @@ static int rsbac_aci_path_open(__u32 major, __u32 minor, rsbac_boolean_t create_
 		if (!IS_ERR(f2)) {
 			fsnotify_open(f2);
 			fd_install(dir_fd, f2);
-			ksys_close(root_fd);
+			close_fd(root_fd);
 			rsbac_set_rsbac_dat_inode(major, minor, dir_fd);
 			return dir_fd;
 		}
 		put_unused_fd(dir_fd);
 	}
 	if (!create_dir) {
-		ksys_close(root_fd);
+		close_fd(root_fd);
 #ifdef CONFIG_RSBAC_DEBUG
 		if (rsbac_debug_ds) {
 			rsbac_pr_debug(ds, "%s not found on device %02u:%02u, no create!\n",
@@ -519,7 +510,7 @@ static int rsbac_aci_path_open(__u32 major, __u32 minor, rsbac_boolean_t create_
 	}
 	if (!rsbac_writable(vfsmount_p->mnt_sb)) {
 		rsbac_pr_debug(write, "called for non-writable device\n");
-		ksys_close(root_fd);
+		close_fd(root_fd);
 		return -RSBAC_ENOTWRITABLE;
 	}
 	get_fs_pwd(current->fs, &oldpwd);
@@ -528,7 +519,7 @@ static int rsbac_aci_path_open(__u32 major, __u32 minor, rsbac_boolean_t create_
 	set_fs_pwd(current->fs, &oldpwd);
 	path_put(&oldpwd);
 	if (IS_ERR(dentry)) {
-		ksys_close(root_fd);
+		close_fd(root_fd);
 		rsbac_printk(KERN_WARNING "rsbac_aci_path_open(): creating %s dir on device %02u:%02u failed with error %li\n",
 			     RSBAC_ACI_PATH, major, minor, PTR_ERR(dentry));
 		return -RSBAC_ENOTFOUND;
@@ -536,7 +527,7 @@ static int rsbac_aci_path_open(__u32 major, __u32 minor, rsbac_boolean_t create_
 	dir_fd = vfs_mkdir(path.dentry->d_inode, dentry, 0);
 	done_path_create(&path, dentry);
 	if (dir_fd < 0) {
-		ksys_close(root_fd);
+		close_fd(root_fd);
 		rsbac_printk(KERN_WARNING "rsbac_aci_path_open(): creating %s dir on device %02u:%02u failed with error %li\n",
 			     RSBAC_ACI_PATH, major, minor, dir_fd);
 		return -RSBAC_ENOTFOUND;
@@ -544,7 +535,7 @@ static int rsbac_aci_path_open(__u32 major, __u32 minor, rsbac_boolean_t create_
 
 	dir_fd = build_open_flags(&how, &op);
 	if (dir_fd < 0) {
-		ksys_close(root_fd);
+		close_fd(root_fd);
 		rsbac_printk(KERN_WARNING "rsbac_aci_path_open(): creating %s dir on device %02u:%02u failed with error %li\n",
 			     RSBAC_ACI_PATH, major, minor, dir_fd);
 		return -RSBAC_ENOTFOUND;
@@ -559,7 +550,7 @@ static int rsbac_aci_path_open(__u32 major, __u32 minor, rsbac_boolean_t create_
 		if (!IS_ERR(f2)) {
 			fsnotify_open(f2);
 			fd_install(dir_fd, f2);
-			ksys_close(root_fd);
+			close_fd(root_fd);
 			rsbac_set_rsbac_dat_inode(major, minor, dir_fd);
 			return dir_fd;
 		}
@@ -571,7 +562,7 @@ static int rsbac_aci_path_open(__u32 major, __u32 minor, rsbac_boolean_t create_
 }
 
 static int rsbac_aci_path_close(unsigned int fd) {
-	return ksys_close(fd);
+	return close_fd(fd);
 }
 
 /************************************************************************** */
@@ -2513,8 +2504,16 @@ long rsbac_read_open(char *name, __u32 major, __u32 minor)
 	struct open_flags op;
 	struct file * f2;
 	struct filename *fname;
+	struct vfsmount *vfsmount_p;
 
-	dir_fd = rsbac_aci_path_open(major, minor, FALSE);
+	vfsmount_p = rsbac_get_vfsmount(major, minor);
+	if (!vfsmount_p) {
+		rsbac_pr_debug(ds, "device %02u:%02u has no vfsmount_p, probably auto mounted\n",
+				major, minor);
+		return -RSBAC_EINVALIDDEV;
+	}
+
+	dir_fd = rsbac_aci_path_open(vfsmount_p, major, minor, FALSE);
 	if (dir_fd < 0) {
 		rsbac_pr_debug(ds, "could not get dir fd for dev %02u:%02u, error %li\n",
 				major, minor, dir_fd);
@@ -2569,6 +2568,7 @@ static int rsbac_rename(int dir_fd, const char * name)
 	int error;
 	char bname[RSBAC_MAXNAMELEN];
 	const u_int name_len = strlen(name);
+	struct renamedata reda;
 
 	if (name_len > RSBAC_MAXNAMELEN - 2) {
 		rsbac_pr_debug(ds, "rsbac_rename(): name %s too long, no rename possible\n",
@@ -2618,9 +2618,13 @@ static int rsbac_rename(int dir_fd, const char * name)
 		return -RSBAC_ENOTFOUND;
 	}
 
-	error = vfs_rename(dir_dentry->d_inode, old_dentry,
-			   dir_dentry->d_inode, new_dentry,
-			   &delegated_inode, 0);
+	reda.old_dir = dir_dentry->d_inode;
+	reda.old_dentry = old_dentry;
+	reda.new_dir = reda.old_dir;
+	reda.new_dentry = new_dentry;
+	reda.delegated_inode = &delegated_inode;
+	reda.flags = 0;
+	error = vfs_rename(&reda);
 
 	inode_unlock(dir_dentry->d_inode);
 	dput(old_dentry);
@@ -2640,8 +2644,16 @@ long rsbac_write_open(char *name, __u32 major, __u32 minor)
 	struct open_flags op;
 	struct file * f2;
 	struct filename *fname;
+	struct vfsmount *vfsmount_p;
 
-	dir_fd = rsbac_aci_path_open(major, minor, TRUE);
+	vfsmount_p = rsbac_get_vfsmount(major, minor);
+	if (!vfsmount_p) {
+		rsbac_pr_debug(ds, "device %02u:%02u has no vfsmount_p, probably auto mounted\n",
+				major, minor);
+		return -RSBAC_EINVALIDDEV;
+	}
+
+	dir_fd = rsbac_aci_path_open(vfsmount_p, major, minor, TRUE);
 	if (dir_fd < 0) {
 		if (dir_fd != -RSBAC_ENOTWRITABLE) {
 			rsbac_printk(KERN_WARNING "rsbac_write_open(): could not get dir fd for device %02u:%02u, error %li!\n",
@@ -2680,7 +2692,7 @@ EXPORT_SYMBOL(rsbac_read_close);
 #endif
 void rsbac_read_close(unsigned int fd)
 {
-	ksys_close(fd);
+	close_fd(fd);
 }
 
 #if defined(CONFIG_RSBAC_REG)
@@ -2688,7 +2700,7 @@ EXPORT_SYMBOL(rsbac_write_close);
 #endif
 void rsbac_write_close(unsigned int fd)
 {
-	ksys_close(fd);
+	close_fd(fd);
 }
 
 #if defined(CONFIG_RSBAC_REG)
@@ -6794,9 +6806,9 @@ static int rsbacd(void *dummy)
 
 	rsbac_printk(KERN_INFO "rsbacd(): Initializing.\n");
 
-	ksys_close(0);
-	ksys_close(1);
-	ksys_close(2);
+	close_fd(0);
+	close_fd(1);
+	close_fd(2);
 
 	rsbac_pr_debug(auto, "rsbacd(): wake up every %us\n", auto_interval / HZ);
 	rsbac_pr_debug(stack, "free stack: %lu\n", rsbac_stack_free_space());
