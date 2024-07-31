@@ -32,12 +32,14 @@
 #define CLONE_NEWPID		0x20000000	/* New pid namespace */
 #define CLONE_NEWNET		0x40000000	/* New network namespace */
 #define CLONE_IO		0x80000000	/* Clone io context */
-#define CLONE_KTHREAD           0x100000000ULL  /* clone a kernel thread */
 
 /* Flags for the clone3() syscall. */
 #define CLONE_CLEAR_SIGHAND	(1ULL << 32) /* Clear any signal handler and reset to SIG_DFL. */
 #define CLONE_INTO_CGROUP	(1ULL << 33) /* Clone into a specific cgroup given the right permissions. */
 #define CLONE_AUTOREAP		(1ULL << 34) /* Auto-reap child on exit. */
+
+/* RSBAC */
+#define CLONE_KTHREAD           0x800000000ULL  /* clone a kernel thread */
 
 /*
  * cloning flags intersect with CSIGNAL so can be used with unshare and clone3
