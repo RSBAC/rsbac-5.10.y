@@ -2501,6 +2501,9 @@ int fcntl_getlk(struct file *filp, unsigned int cmd, struct flock *flock)
 #endif
 	rsbac_pr_debug(aef, "[sys_fcntl()]: calling ADF\n");
 	rsbac_target = T_FILE;
+	rsbac_target_id.file.device = filp->f_path.dentry->d_sb->s_dev;
+	rsbac_target_id.file.inode  = filp->f_path.dentry->d_inode->i_ino;
+	rsbac_target_id.file.dentry_p = filp->f_path.dentry;
 	if (S_ISDIR(filp->f_path.dentry->d_inode->i_mode))
 		rsbac_target = T_DIR;
 	else if (S_ISFIFO(filp->f_path.dentry->d_inode->i_mode))
@@ -2509,12 +2512,14 @@ int fcntl_getlk(struct file *filp, unsigned int cmd, struct flock *flock)
 		rsbac_target = T_SYMLINK;
 	else if (S_ISSOCK(filp->f_path.dentry->d_inode->i_mode))
 		rsbac_target = T_UNIXSOCK;
-	rsbac_target_id.file.device = filp->f_path.dentry->d_sb->s_dev;
-	rsbac_target_id.file.inode  = filp->f_path.dentry->d_inode->i_ino;
-	rsbac_target_id.file.dentry_p = filp->f_path.dentry;
+	else if (filp->f_path.dentry->d_inode->i_rsbac_memfd) {
+			rsbac_target = T_IPC;
+			rsbac_target_id.ipc.type = I_memfd;
+			rsbac_target_id.ipc.id.id_nr = (u_long) filp->f_path.dentry->d_inode;
+	}
 	rsbac_attribute_value.dummy = 0;
 #if defined(CONFIG_RSBAC_FSOBJ_HIDE)
-	if (!rsbac_adf_request(R_SEARCH,
+	if (rsbac_target != T_IPC && !rsbac_adf_request(R_SEARCH,
 				task_pid(current),
 				rsbac_target,
 				rsbac_target_id,
@@ -2807,6 +2812,9 @@ int fcntl_getlk64(struct file *filp, unsigned int cmd, struct flock64 *flock)
 #endif
 	rsbac_pr_debug(aef, "[sys_fcntl()]: calling ADF\n");
 	rsbac_target = T_FILE;
+	rsbac_target_id.file.device = filp->f_path.dentry->d_sb->s_dev;
+	rsbac_target_id.file.inode  = filp->f_path.dentry->d_inode->i_ino;
+	rsbac_target_id.file.dentry_p = filp->f_path.dentry;
 	if (S_ISDIR(filp->f_path.dentry->d_inode->i_mode))
 		rsbac_target = T_DIR;
 	else if (S_ISFIFO(filp->f_path.dentry->d_inode->i_mode))
@@ -2815,12 +2823,14 @@ int fcntl_getlk64(struct file *filp, unsigned int cmd, struct flock64 *flock)
 		rsbac_target = T_SYMLINK;
 	else if (S_ISSOCK(filp->f_path.dentry->d_inode->i_mode))
 		rsbac_target = T_UNIXSOCK;
-	rsbac_target_id.file.device = filp->f_path.dentry->d_sb->s_dev;
-	rsbac_target_id.file.inode  = filp->f_path.dentry->d_inode->i_ino;
-	rsbac_target_id.file.dentry_p = filp->f_path.dentry;
+	else if (filp->f_path.dentry->d_inode->i_rsbac_memfd) {
+			rsbac_target = T_IPC;
+			rsbac_target_id.ipc.type = I_memfd;
+			rsbac_target_id.ipc.id.id_nr = (u_long) filp->f_path.dentry->d_inode;
+	}
 	rsbac_attribute_value.dummy = 0;
 #if defined(CONFIG_RSBAC_FSOBJ_HIDE)
-	if (!rsbac_adf_request(R_SEARCH,
+	if (rsbac_target != T_IPC && !rsbac_adf_request(R_SEARCH,
 				task_pid(current),
 				rsbac_target,
 				rsbac_target_id,
