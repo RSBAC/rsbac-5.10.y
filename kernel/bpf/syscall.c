@@ -4400,7 +4400,7 @@ SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, siz
 	union bpf_attr attr;
 	int err;
 
-#ifdef CONFIG_RSBAC_NET
+#ifdef CONFIG_RSBAC
 	enum  rsbac_adf_request_t     rsbac_adf_req;
 	union rsbac_target_id_t       rsbac_target_id;
 	union rsbac_attribute_value_t rsbac_attribute_value;
@@ -4423,7 +4423,7 @@ SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, siz
 	if (err < 0)
 		return err;
 
-#ifdef CONFIG_RSBAC_NET
+#ifdef CONFIG_RSBAC
 	switch (cmd) {
 		case BPF_MAP_LOOKUP_ELEM:
 		case BPF_MAP_GET_NEXT_KEY:
